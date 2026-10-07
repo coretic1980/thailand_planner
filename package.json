@@ -1,0 +1,18 @@
+{
+  "name": "thailand-reisapp",
+  "version": "1.0.0",
+  "description": "Reisapp voor de roadtrip Bangkok - Phuket, februari 2027",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "db:reset": "node db/reset.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}
