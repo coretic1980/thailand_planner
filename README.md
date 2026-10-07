@@ -48,7 +48,7 @@ Zet deze map in een nieuwe (private) GitHub-repository.
    - `ANTHROPIC_API_KEY`: nodig voor het tabblad Aanpassen.
 3. Deploy. In de logs zie je bij de eerste start: `Database gevuld met de reisgegevens.`
 
-Het wachtwoord vraagt de browser één keer; de gebruikersnaam maakt niet uit.
+De app toont eerst een inlogscherm. Na het juiste wachtwoord blijf je 30 dagen ingelogd op dat apparaat; uitloggen kan onder Info. Verander je `APP_PASSWORD`, dan moet iedereen opnieuw inloggen. Na 10 foute pogingen in een kwartier blokkeert de app dat IP-adres tijdelijk.
 
 ### Lokaal draaien
 ```bash

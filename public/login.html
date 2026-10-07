@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e6e6a">
+<meta name="robots" content="noindex">
+<title>Thailand Roadtrip 2027</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%230e6e6a%22/%3E%3Cpath d=%22M6 20 L13 11 L18 17 L22 13 L27 20 Z%22 fill=%22%23e2603b%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,700&display=swap">
+<style>
+:root{
+  --bg:#f3f6f5; --surface:#ffffff; --fg:#14302e; --muted:#5b726f; --line:#d8e2df;
+  --sea:#0e6e6a; --sun:#e2603b;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"Nunito Sans", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0d1a1a; --surface:#142625; --fg:#e4efed; --muted:#93aaa6; --line:#24403d;
+  --sea:#4fc2b8; --sun:#f08a63; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);display:grid;place-items:center;padding:24px 16px}
+.card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.photo{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--line)}
+.in{padding:20px 22px 24px;display:grid;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--sea);font-weight:700}
+h1{font-family:var(--display);font-weight:800;font-size:30px;line-height:1.05;margin:2px 0 0}
+label{font-weight:700;font-size:14px}
+input{width:100%;font:16px var(--body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:6px}
+input:focus-visible,button:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
+button{font:700 15px var(--body);background:var(--sea);color:var(--surface);border:0;border-radius:10px;padding:12px 16px;cursor:pointer}
+button[disabled]{opacity:.6;cursor:wait}
+.msg{min-height:1.4em;margin:0;font-size:14px;color:var(--sun)}
+</style>
+</head>
+<body>
+<main class="card">
+  <img class="photo" src="img/13-samet-nangshe.jpg" alt="Uitzicht over de kalkrotsen van Phang Nga Bay">
+  <form class="in" id="f" novalidate>
+    <div>
+      <div class="eyebrow">3–17 februari 2027</div>
+      <h1>Bangkok → Phuket</h1>
+    </div>
+    <div>
+      <label for="pw">Wachtwoord</label>
+      <input id="pw" type="password" autocomplete="current-password" required autofocus>
+    </div>
+    <button type="submit" id="go">Inloggen</button>
+    <p class="msg" id="msg" role="alert" aria-live="polite"></p>
+  </form>
+</main>
+<script>
+const f=document.getElementById("f"),pw=document.getElementById("pw"),go=document.getElementById("go"),msg=document.getElementById("msg");
+f.addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(!pw.value){msg.textContent="Vul het wachtwoord in.";pw.focus();return}
+  go.disabled=true;msg.textContent="";
+  try{
+    const r=await fetch("login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:pw.value})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok){location.reload();return}
+    msg.textContent=j.error||"Inloggen lukt nu niet. Probeer het opnieuw.";
+    pw.select();
+  }catch(err){msg.textContent="Geen verbinding. Controleer je internet en probeer het opnieuw."}
+  finally{go.disabled=false}
+});
+</script>
+</body>
+</html>

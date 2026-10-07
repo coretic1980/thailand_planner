@@ -1,7 +1,7 @@
 // Thailand reisapp: Express-server met Neon (Postgres) als database.
 // Omgevingsvariabelen:
 //   DATABASE_URL  - Neon connection string (verplicht)
-//   APP_PASSWORD  - optioneel; als gezet, vraagt de app om dit wachtwoord
+//   APP_PASSWORD  - optioneel; als gezet, toont de app eerst een inlogscherm
 //   PORT          - wordt door Render gezet
 
 const express = require("express");
@@ -23,23 +23,70 @@ app.get("/healthz", async (_req, res) => {
   }
 });
 
-// Optionele wachtwoordbeveiliging (HTTP Basic Auth, gebruikersnaam maakt niet uit)
+// ---------- Inloggen met een wachtwoord (eigen inlogscherm) ----------
+// Na een juist wachtwoord krijgt de browser een cookie dat 30 dagen geldig is.
+// Verander je APP_PASSWORD, dan moet iedereen opnieuw inloggen.
+app.set("trust proxy", 1); // Render zet een proxy voor de app
 const PASSWORD = process.env.APP_PASSWORD || "";
+const COOKIE = "reis_sessie";
+const MAX_AGE = 30 * 24 * 3600; // seconden
 function safeEqual(a, b) {
-  const ha = crypto.createHash("sha256").update(a).digest();
-  const hb = crypto.createHash("sha256").update(b).digest();
+  const ha = crypto.createHash("sha256").update(String(a)).digest();
+  const hb = crypto.createHash("sha256").update(String(b)).digest();
   return crypto.timingSafeEqual(ha, hb);
 }
-app.use((req, res, next) => {
-  if (!PASSWORD) return next();
-  const h = req.headers.authorization || "";
-  if (h.startsWith("Basic ")) {
-    const decoded = Buffer.from(h.slice(6), "base64").toString();
-    const pw = decoded.slice(decoded.indexOf(":") + 1);
-    if (safeEqual(pw, PASSWORD)) return next();
+const sessionToken = () => crypto.createHmac("sha256", PASSWORD).update("thailand-reisapp-sessie-v1").digest("hex");
+function readCookie(req, name) {
+  for (const part of (req.headers.cookie || "").split(";")) {
+    const i = part.indexOf("=");
+    if (i > 0 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
   }
-  res.set("WWW-Authenticate", 'Basic realm="Thailand 2027", charset="UTF-8"');
-  res.status(401).send("Wachtwoord nodig");
+  return "";
+}
+const loggedIn = (req) => !PASSWORD || safeEqual(readCookie(req, COOKIE), sessionToken());
+function setCookie(req, res, value, maxAge) {
+  const secure = req.secure ? "; Secure" : "";
+  res.set("Set-Cookie", `${COOKIE}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure}`);
+}
+
+// Rem op raden: maximaal 10 pogingen per kwartier per IP-adres
+const attempts = new Map();
+function tooManyAttempts(ip) {
+  const now = Date.now();
+  const a = attempts.get(ip) || { n: 0, since: now };
+  if (now - a.since > 15 * 60_000) { a.n = 0; a.since = now; }
+  a.n++;
+  attempts.set(ip, a);
+  if (attempts.size > 5000) attempts.clear();
+  return a.n > 10;
+}
+
+app.post("/login", (req, res) => {
+  if (!PASSWORD) return res.json({ ok: true });
+  if (tooManyAttempts(req.ip)) {
+    return res.status(429).json({ error: "Te veel pogingen. Probeer het over een kwartier opnieuw." });
+  }
+  const pw = typeof req.body?.password === "string" ? req.body.password : "";
+  if (!pw || !safeEqual(pw, PASSWORD)) {
+    return res.status(401).json({ error: "Dat wachtwoord klopt niet." });
+  }
+  attempts.delete(req.ip);
+  setCookie(req, res, sessionToken(), MAX_AGE);
+  res.json({ ok: true });
+});
+
+app.get("/logout", (req, res) => {
+  setCookie(req, res, "", 0);
+  res.redirect("./");
+});
+
+// Het inlogscherm en de foto's mogen zonder wachtwoord; de rest niet
+app.use((req, res, next) => {
+  if (loggedIn(req)) return next();
+  if (req.path.startsWith("/img/")) return next();
+  if (req.path.startsWith("/api/")) return res.status(401).json({ error: "Je bent niet ingelogd. Ververs de pagina." });
+  res.set("Cache-Control", "no-store");
+  res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
 // Alle reisgegevens in één keer
