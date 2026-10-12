@@ -105,6 +105,9 @@ svg{display:block;width:100%;height:auto}
 .kosten .tbl td:first-child{width:auto}
 .kosten .tbl td:last-child{text-align:right;white-space:nowrap}
 .kosten .tbl tr.som td{font-weight:700;color:var(--fg);border-bottom:0}
+.kosten .tbl td{vertical-align:middle}
+.kosten input.prijs{width:110px;text-align:right;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+.kosten input.prijs:focus{outline:2px solid var(--sea);outline-offset:1px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 [hidden]{display:none!important}
 .ai{display:grid;gap:10px;margin-top:12px}
@@ -280,12 +283,33 @@ function drawKosten(){
   const met=BASES.filter(b=>b.prijs!=null&&b.prijs!==""),zonder=BASES.filter(b=>b.prijs==null||b.prijs==="");
   const tot=met.reduce((s,b)=>s+Number(b.prijs),0),nachten=BASES.reduce((s,b)=>s+nachtenVan(b),0);
   const nMet=met.reduce((s,b)=>s+nachtenVan(b),0),pers=parseInt(infoVal("reizigers","4"),10)||4;
-  const rijen=BASES.map(b=>`<tr><td>${esc(b.name)} · ${esc(b.nights)}</td><td>${b.prijs!=null&&b.prijs!==""?eur(b.prijs):"nog onbekend"}</td></tr>`).join("");
+  const bedrag=n=>n==null||n===""?"":Number(n).toLocaleString("nl-NL",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const rijen=BASES.map(b=>`<tr><td><label for="pr-ID-${esc(b.id)}">${esc(b.name)} · ${esc(b.nights)}</label></td><td>€ <input class="prijs" id="pr-ID-${esc(b.id)}" data-id="${esc(b.id)}" inputmode="decimal" autocomplete="off" placeholder="onbekend" value="${bedrag(b.prijs)}" aria-label="Prijs ${esc(b.name)} in euro"></td></tr>`).join("");
   const html=BASES.length?`<div class="note">Accommodaties totaal${zonder.length?" (tot nu toe)":""}</div><div class="tot">${eur(tot)}</div>
    <div class="note">${nachten} nachten${nMet?` · gemiddeld ${eur(tot/nMet)} per nacht`:""} · ${eur(tot/pers)} per persoon (${pers} reizigers)</div>
    ${zonder.length?`<p class="note" style="margin:6px 0 0">Nog zonder prijs: ${zonder.map(b=>esc(b.name)).join(", ")}</p>`:""}
-   <table class="tbl" style="margin-top:8px">${rijen}<tr class="som"><td>Totaal</td><td>${eur(tot)}</td></tr></table>`:"";
-  ["kosten-plekken","kosten-check"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=html});
+   <table class="tbl" style="margin-top:8px">${rijen}<tr class="som"><td>Totaal</td><td>${eur(tot)}</td></tr></table>
+   <p class="note kosten-msg" aria-live="polite" style="margin:6px 0 0">Pas een bedrag aan en druk op Enter; het totaal rekent vanzelf opnieuw.</p>`:"";
+  ["kosten-plekken","kosten-check"].forEach(id=>{const el=document.getElementById(id);if(!el)return;
+    const actief=document.activeElement&&el.contains(document.activeElement)&&document.activeElement.classList.contains("prijs");
+    if(actief)return; // niet opnieuw tekenen terwijl iemand typt
+    el.innerHTML=html.replace(/pr-ID-/g,"pr-"+id+"-");
+    el.querySelectorAll("input.prijs").forEach(inp=>{
+      inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();inp.blur()}});
+      inp.addEventListener("change",()=>prijsWijzigen(inp,el.querySelector(".kosten-msg")));
+    });
+  });
+}
+function leesBedrag(v){const t=String(v).replace(/[€\s]/g,"");if(!t)return null;const n=Number(t.includes(",")?t.replace(/\./g,"").replace(",","."):t);return Number.isFinite(n)&&n>=0&&n<=100000?Math.round(n*100)/100:NaN}
+async function prijsWijzigen(inp,msg){
+  const b=BASES.find(x=>x.id===inp.dataset.id);if(!b)return;
+  const n=leesBedrag(inp.value);
+  const zeg=(t,err)=>{if(msg){msg.textContent=t;msg.style.color=err?"var(--sun)":"var(--muted)"}};
+  if(Number.isNaN(n)){zeg("Dat is geen geldig bedrag. Gebruik bijvoorbeeld 298,20.",true);return}
+  if((b.prijs??null)===n){drawKosten();return}
+  zeg("Opslaan…");
+  try{await savePrice(b,n);zeg("Opgeslagen. Ook de beschrijving en de reservering zijn bijgewerkt.")}
+  catch(e){zeg(e&&e.message?e.message:"Opslaan mislukt. Probeer het opnieuw.",true)}
 }
 function drawCheck(){
   document.getElementById("checklist").innerHTML=CHECK.map(c=>`<li><label for="c-${esc(c.id)}"><input type="checkbox" id="c-${esc(c.id)}" data-id="${esc(c.id)}" ${c.done?"checked":""}>
@@ -303,6 +327,13 @@ async function toggle(id,done){
     if(!r.ok)throw new Error(r.status);
     setSync("Opgeslagen");
   }catch(e){item.done=before;drawCheck();setSync("Opslaan mislukt. Controleer je internetverbinding en probeer het opnieuw.",true)}
+}
+async function savePrice(b,prijs){
+  const r=await fetch("api/bases/"+encodeURIComponent(b.id)+"/prijs",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({prijs})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||"Opslaan mislukt. Probeer het opnieuw.");
+  await loadTrip();renderAll();
+  if(aiEnabled)loadHistory();
 }
 function setSync(t,err){const el=document.getElementById("sync");el.textContent=t;el.style.color=err?"var(--sun)":"var(--muted)"}
 const infoRow=id=>INFO.find(r=>r.id===id)||{};

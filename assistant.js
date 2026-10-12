@@ -79,7 +79,7 @@ function cleanValue(type, v) {
       if (v === null || v === "") return null;
       const t = typeof v === "string" ? v.replace(/[€\s]/g, "") : null;
       const n = t === null ? v : Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
-      if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > 100000) throw new UserError("Ongeldige prijs in het voorstel.");
+      if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > 100000) throw new UserError("Ongeldig bedrag. Gebruik bijvoorbeeld 298,20.");
       return Math.round(n * 100) / 100;
     }
     case "sectie":
@@ -433,6 +433,54 @@ async function applyChanges(client, prompt, summary, changes) {
   }
 }
 
+// ---------- Prijs direct aanpassen (zonder Claude) ----------
+
+const fmtEur = (n) => Number(n).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Vervang "€ <oud bedrag>" in een tekst door het nieuwe bedrag. Geeft null terug als er niets verandert.
+function replacePrice(text, oud, nieuw) {
+  if (typeof text !== "string" || oud == null || nieuw == null) return null;
+  const varianten = new Set([fmtEur(oud), fmtEur(oud).replace(/,00$/, ""), fmtEur(oud).replace(/0$/, "")]);
+  let out = text;
+  for (const v of [...varianten].sort((a, b) => b.length - a.length)) {
+    const re = new RegExp("(€\\s?)" + v.replace(/[.,]/g, "\\$&") + "(?![\\d,])", "g");
+    out = out.replace(re, (_, e) => e + fmtEur(nieuw));
+  }
+  return out === text ? null : out;
+}
+
+async function setPrice(id, waarde) {
+  const prijs = cleanValue("prijs", waarde);
+  const base = await getRow(db, ENTITIES.overnachting, String(id));
+  if (!base) throw new UserError("Deze overnachting bestaat niet.");
+  const oud = base.prijs == null ? null : Number(base.prijs);
+  if (oud === prijs) return { id, prijs };
+  const changes = [];
+  const velden = { prijs };
+  const why = replacePrice(base.why, oud, prijs);
+  if (why && why.length <= 300) velden.why = why;
+  changes.push({ actie: "wijzigen", soort: "overnachting", sleutel: base.id, velden });
+  if (oud != null && prijs != null) {
+    const { rows } = await db.query("select id, note from checklist where note like '%€%'");
+    for (const r of rows) {
+      const note = replacePrice(r.note, oud, prijs);
+      if (note && note.length <= 300) changes.push({ actie: "wijzigen", soort: "reservering", sleutel: r.id, velden: { note } });
+    }
+  }
+  const label = `Prijs ${base.name}: ${prijs == null ? "onbekend" : "€ " + fmtEur(prijs)}`;
+  const client = await db.pool.connect();
+  try {
+    await client.query("begin");
+    const logId = await applyChanges(client, label, `${label} (was ${oud == null ? "onbekend" : "€ " + fmtEur(oud)}).`, changes);
+    await client.query("commit");
+    return { id: base.id, prijs, changeLogId: logId };
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 async function undoLast() {
   const client = await db.pool.connect();
   try {
@@ -484,4 +532,4 @@ async function dataVersion() {
   return r.rows[0].v;
 }
 
-module.exports = { status, propose, openProposal, cancel, applyProposal, undoLast, history, dataVersion, UserError };
+module.exports = { status, propose, openProposal, cancel, applyProposal, undoLast, history, dataVersion, setPrice, replacePrice, UserError };

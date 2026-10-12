@@ -147,6 +147,9 @@ app.patch("/api/checklist/:id", async (req, res, next) => {
 // ---------- Aanpassen via prompts ----------
 const assistant = require("./assistant");
 
+// Prijs van een overnachting direct aanpassen (veld in de kostenlijst)
+app.patch("/api/bases/:id/prijs", handle((req) => assistant.setPrice(req.params.id, req.body?.prijs ?? null)));
+
 // Eenvoudige limiet: maximaal 30 voorstellen per uur (beschermt je API-tegoed)
 let windowStart = Date.now(), proposals = 0;
 function underLimit() {
