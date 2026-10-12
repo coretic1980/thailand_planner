@@ -44,6 +44,7 @@ const PHOTOS = [
 ];
 
 class UserError extends Error {}
+const MAX_CHANGES = 40;
 
 function status() {
   if (!API_KEY) return { enabled: false, reason: "ANTHROPIC_API_KEY is niet ingesteld op de server." };
@@ -197,7 +198,7 @@ const TOOL = {
 
 function systemPrompt(data) {
   return `Je beheert de gegevens van een reisapp voor een gezinsroadtrip door Thailand (3–17 februari 2027).
-De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulpmiddel "voorstel" precies die wijzigingen voor, niets meer.
+De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulpmiddel "voorstel" die wijziging voor, plus alles wat nodig is om de rest van de app ermee in overeenstemming te houden.
 
 Regels:
 - Gebruik alleen de sleutels uit de huidige gegevens hieronder.
@@ -211,7 +212,13 @@ Regels:
 - Houd de stijl van de bestaande teksten aan: kort, Nederlands, geen emoji.
 - Als iets in het verzoek niet kan of onduidelijk is, geef dan een lege lijst wijzigingen en leg in de samenvatting uit wat je nodig hebt.
 - Roep altijd het hulpmiddel "voorstel" aan, ook als er niets te wijzigen valt (dan met een lege lijst wijzigingen).
-- Verander nooit iets waar de gebruiker niet om vraagt. Als een verzoek ook een andere dag raakt (bijvoorbeeld iets verplaatsen), pas dan beide dagen aan.
+- Houd de app consistent. Heeft een wijziging gevolgen elders, neem die dan op in hetzelfde voorstel en noem ze in de samenvatting. In het bijzonder:
+  - Verandert het hotel of de data van een overnachting, pas dan ook de reservering aan die erover gaat (de titel noemt het hotel of de plaats en de data).
+  - De data van overnachtingen sluiten op elkaar aan: de vertrekdatum van de ene is de aankomstdatum van de volgende. Het aantal nachten klopt met de data. De reis zelf ligt vast op 3–17 februari 2027.
+  - Schuift een overnachting op, pas dan ook het dagprogramma aan (de reisdag "Naar …" met rijtijd valt op de aankomstdatum), de ritten (date_label) en de reserveringen met een datum erin.
+  - Wordt een activiteit verplaatst, haal hem dan weg bij de oude dag en zet hem bij de nieuwe dag. Staat er een reservering voor, pas daar de datum aan.
+  - Eigen notities van de gebruiker (prijzen, annuleringsvoorwaarden, boekingsnummers) laat je staan, tenzij de gebruiker vraagt ze te veranderen.
+- Verander niets wat niet met het verzoek te maken heeft.
 
 Huidige gegevens (JSON):
 ${JSON.stringify(data)}`;
@@ -232,7 +239,7 @@ async function callClaude(prompt, data) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4000,
+        max_tokens: 8000,
         system: systemPrompt(data),
         tools: [TOOL],
         tool_choice: { type: "auto" },
@@ -274,19 +281,62 @@ async function propose(prompt, { claude = callClaude } = {}) {
   if (prompt.length > 1000) throw new UserError("Je vraag is te lang (maximaal 1000 tekens).");
   const data = await snapshot();
   const raw = await claude(prompt.trim(), data);
-  const changes = (Array.isArray(raw.wijzigingen) ? raw.wijzigingen : []).slice(0, 20).map(cleanChange);
+  const changes = (Array.isArray(raw.wijzigingen) ? raw.wijzigingen : []).slice(0, MAX_CHANGES).map(cleanChange);
   const beschrijving = [];
   for (const c of changes) beschrijving.push(await describe(c));
-  return { samenvatting: String(raw.samenvatting || "").slice(0, 600), wijzigingen: changes, beschrijving };
+  const samenvatting = String(raw.samenvatting || "").slice(0, 600);
+  // Bewaar het voorstel. Een eerder open voorstel wordt vervangen door dit nieuwe.
+  await db.query("update voorstellen set status = 'vervangen', decided_at = now() where status = 'open'");
+  const r = await db.query(
+    "insert into voorstellen (prompt, samenvatting, wijzigingen, beschrijving, status) values ($1,$2,$3,$4,$5) returning id, created_at",
+    [prompt.trim(), samenvatting, JSON.stringify(changes), JSON.stringify(beschrijving), changes.length ? "open" : "uitleg"]
+  );
+  return { id: r.rows[0].id, status: changes.length ? "open" : "uitleg", samenvatting, wijzigingen: changes, beschrijving, prompt: prompt.trim(), created_at: r.rows[0].created_at };
 }
 
-async function apply(prompt, summary, changes) {
-  if (!Array.isArray(changes) || !changes.length) throw new UserError("Er zijn geen wijzigingen om toe te passen.");
-  if (changes.length > 20) throw new UserError("Te veel wijzigingen in één keer.");
-  const clean = changes.map(cleanChange);
+// Het laatste open voorstel (bijvoorbeeld na verversen van de pagina)
+async function openProposal() {
+  const r = await db.query(
+    "select id, prompt, samenvatting, wijzigingen, beschrijving, status, created_at from voorstellen where status = 'open' order by id desc limit 1"
+  );
+  return r.rows[0] || null;
+}
+
+async function cancel(id) {
+  const r = await db.query(
+    "update voorstellen set status = 'geannuleerd', decided_at = now() where id = $1 and status = 'open' returning id",
+    [Number(id)]
+  );
+  if (!r.rowCount) throw new UserError("Dit voorstel is al afgehandeld.");
+  return { id: r.rows[0].id };
+}
+
+// Pas een opgeslagen voorstel toe (op id; de wijzigingen komen uit de database, niet uit de browser)
+async function applyProposal(id) {
   const client = await db.pool.connect();
   try {
     await client.query("begin");
+    const r = await client.query("select * from voorstellen where id = $1 for update", [Number(id)]);
+    const v = r.rows[0];
+    if (!v) throw new UserError("Dit voorstel bestaat niet.");
+    if (v.status !== "open") throw new UserError("Dit voorstel is al afgehandeld. Ververs de pagina.");
+    const logId = await applyChanges(client, v.prompt, v.samenvatting, v.wijzigingen);
+    await client.query("update voorstellen set status = 'toegepast', decided_at = now(), change_log_id = $2 where id = $1", [v.id, logId]);
+    await client.query("commit");
+    return { id: v.id, changeLogId: logId };
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function applyChanges(client, prompt, summary, changes) {
+  if (!Array.isArray(changes) || !changes.length) throw new UserError("Er zijn geen wijzigingen om toe te passen.");
+  if (changes.length > MAX_CHANGES) throw new UserError("Te veel wijzigingen in één keer.");
+  const clean = changes.map(cleanChange);
+  {
     const log = [];
     for (const c of clean) {
       const ent = ENTITIES[c.soort];
@@ -319,13 +369,7 @@ async function apply(prompt, summary, changes) {
       "insert into change_log (prompt, summary, changes) values ($1,$2,$3) returning id",
       [String(prompt || "").slice(0, 1000), String(summary || "").slice(0, 600), JSON.stringify({ wijzigingen: clean, log })]
     );
-    await client.query("commit");
-    return { id: r.rows[0].id };
-  } catch (e) {
-    await client.query("rollback").catch(() => {});
-    throw e;
-  } finally {
-    client.release();
+    return r.rows[0].id;
   }
 }
 
@@ -353,11 +397,31 @@ async function undoLast() {
   }
 }
 
+// Geschiedenis: alle voorstellen met hun status, plus oudere wijzigingen van vóór de voorstellen-tabel
 async function history() {
-  const r = await db.query(
-    "select id, prompt, summary, created_at, undone_at, jsonb_array_length(changes->'wijzigingen') as aantal from change_log order by id desc limit 15"
-  );
+  const r = await db.query(`
+    select * from (
+      select v.id, v.prompt, v.samenvatting as summary, v.created_at,
+             case when v.status = 'toegepast' and cl.undone_at is not null then 'teruggedraaid' else v.status end as status,
+             jsonb_array_length(v.wijzigingen) as aantal
+        from voorstellen v left join change_log cl on cl.id = v.change_log_id
+      union all
+      select -cl.id, cl.prompt, cl.summary, cl.created_at,
+             case when cl.undone_at is not null then 'teruggedraaid' else 'toegepast' end,
+             jsonb_array_length(cl.changes->'wijzigingen')
+        from change_log cl
+       where not exists (select 1 from voorstellen v where v.change_log_id = cl.id)
+    ) h order by created_at desc limit 20`);
   return r.rows;
 }
 
-module.exports = { status, propose, apply, undoLast, history, UserError };
+// Een korte "versie" van alle gegevens; verandert bij elke wijziging. Gebruikt om andere apparaten te verversen.
+async function dataVersion() {
+  const r = await db.query(`select md5(concat_ws('|',
+      (select max(id) from change_log), (select count(*) from change_log where undone_at is not null),
+      (select max(updated_at) from checklist), (select count(*) from checklist),
+      (select max(id) from voorstellen), (select max(decided_at) from voorstellen))) as v`);
+  return r.rows[0].v;
+}
+
+module.exports = { status, propose, openProposal, cancel, applyProposal, undoLast, history, dataVersion, UserError };

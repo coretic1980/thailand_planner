@@ -335,7 +335,7 @@ loadTrip().then(()=>{renderAll();show(startTab)}).catch(()=>{
   document.getElementById("legs").innerHTML='<li><span></span><span>De reisgegevens konden niet worden geladen. Ververs de pagina om het opnieuw te proberen.</span><span></span></li>';
 });
 // ---------- Aanpassen via prompts ----------
-let proposal=null,lastPrompt="";
+let proposal=null;
 const $=id=>document.getElementById(id);
 function aiMsg(t,err){const el=$("ai-status");el.textContent=t;el.style.color=err?"var(--sun)":"var(--muted)"}
 async function api(path,body){
@@ -344,56 +344,95 @@ async function api(path,body){
   if(!r.ok)throw new Error(j.error||"Er ging iets mis. Probeer het opnieuw.");
   return j;
 }
+// Melding die een volledige pagina-verversing overleeft
+function reloadWith(msg){
+  try{sessionStorage.setItem("thai27-msg",msg);localStorage.setItem("thai27-tab","edit")}catch(e){}
+  location.reload();
+}
+const STATUS={open:"wacht op toepassen",toegepast:"toegepast",teruggedraaid:"teruggedraaid",geannuleerd:"geannuleerd",vervangen:"vervangen door een nieuwer voorstel",uitleg:"geen wijzigingen"};
 function renderProposal(){
   const box=$("ai-proposal");
   if(!proposal){box.hidden=true;box.innerHTML="";return}
   const n=proposal.wijzigingen.length;
-  box.innerHTML=`<h3>Voorstel</h3><p style="margin:0">${esc(proposal.samenvatting)}</p>`+
+  const when=proposal.created_at?new Date(proposal.created_at).toLocaleString("nl-NL",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"";
+  box.innerHTML=`<h3>Voorstel</h3><p class="note" style="margin:0">“${esc(proposal.prompt||"")}”${when?` · ${esc(when)}`:""}</p><p style="margin:0">${esc(proposal.samenvatting)}</p>`+
    proposal.beschrijving.map(b=>`<div class="chg"><b>${esc(b.titel)}</b>${b.regels.length?`<div class="diff">${b.regels.map(r=>typeof r==="string"?`<span></span><span>${esc(r)}</span>`:`<span class="note">${esc(r.veld)}</span><span><span class="old">${esc(r.voor)}</span><br><span class="new">${esc(r.na)}</span></span>`).join("")}</div>`:""}</div>`).join("")+
    `<div class="btns">${n?`<button type="button" class="primary" id="ai-apply">Toepassen</button>`:""}<button type="button" class="ghost" id="ai-cancel">${n?"Annuleren":"Sluiten"}</button></div>`;
   box.hidden=false;
   if(n)$("ai-apply").addEventListener("click",applyProposal);
-  $("ai-cancel").addEventListener("click",()=>{proposal=null;renderProposal();aiMsg("")});
+  $("ai-cancel").addEventListener("click",cancelProposal);
 }
 async function makeProposal(e){
   e.preventDefault();
   const prompt=$("ai-prompt").value.trim();
   if(!prompt){aiMsg("Typ eerst wat je wilt aanpassen.",true);return}
   $("ai-go").disabled=true;proposal=null;renderProposal();aiMsg("Claude maakt een voorstel…");
-  try{proposal=await api("api/assistant/propose",{prompt});lastPrompt=prompt;aiMsg("");renderProposal()}
-  catch(err){aiMsg(err.message,true)}
+  try{
+    proposal=await api("api/assistant/propose",{prompt});
+    $("ai-prompt").value="";aiMsg(proposal.wijzigingen.length?"Voorstel opgeslagen. Controleer het en kies Toepassen.":"");
+    renderProposal();loadHistory();
+  }catch(err){aiMsg(err.message,true)}
   finally{$("ai-go").disabled=false}
 }
 async function applyProposal(){
   const btn=$("ai-apply");btn.disabled=true;aiMsg("Opslaan…");
   try{
-    await api("api/assistant/apply",{prompt:lastPrompt,samenvatting:proposal.samenvatting,wijzigingen:proposal.wijzigingen});
-    proposal=null;renderProposal();$("ai-prompt").value="";
-    await loadTrip();renderAll();await loadHistory();
-    aiMsg("Toegepast. De app is bijgewerkt.");
-  }catch(err){btn.disabled=false;aiMsg(err.message,true)}
+    await api("api/assistant/apply",{id:proposal.id});
+    reloadWith("Toegepast. Alle gegevens in de app zijn bijgewerkt.");
+  }catch(err){btn.disabled=false;aiMsg(err.message,true);loadOpen()}
+}
+async function cancelProposal(){
+  if(!proposal)return;
+  const p=proposal;proposal=null;renderProposal();
+  if(p.status!=="open"||!p.wijzigingen.length){aiMsg("");return}
+  try{await api("api/assistant/cancel",{id:p.id});aiMsg("Voorstel geannuleerd.");loadHistory()}
+  catch(err){aiMsg(err.message,true)}
+}
+async function loadOpen(){
+  try{const p=await api("api/assistant/open");if(p&&(!proposal||proposal.id!==p.id)){proposal=p;renderProposal()}
+    if(!p&&proposal&&proposal.status==="open"){proposal=null;renderProposal()}}catch(e){}
 }
 async function loadHistory(){
   try{
     const rows=await api("api/assistant/history");
-    $("ai-hist").innerHTML=rows.length?rows.map(r=>`<li><div class="${r.undone_at?"undone":""}">${esc(r.prompt)}</div><div class="when">${new Date(r.created_at).toLocaleString("nl-NL",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})} · ${r.aantal} ${r.aantal==1?"wijziging":"wijzigingen"}${r.undone_at?" · teruggedraaid":""}</div></li>`).join(""):'<li class="note">Nog geen wijzigingen.</li>';
-    $("ai-undo").hidden=!rows.some(r=>!r.undone_at);
+    $("ai-hist").innerHTML=rows.length?rows.map(r=>{const st=STATUS[r.status]||r.status;const dim=["teruggedraaid","geannuleerd","vervangen"].includes(r.status);
+      return `<li><div class="${dim?"undone":""}">${esc(r.prompt)}</div><div class="when">${new Date(r.created_at).toLocaleString("nl-NL",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})} · ${r.aantal} ${r.aantal==1?"wijziging":"wijzigingen"} · ${esc(st)}</div></li>`}).join(""):'<li class="note">Nog geen wijzigingen.</li>';
+    $("ai-undo").hidden=!rows.some(r=>r.status==="toegepast");
   }catch(e){}
 }
 async function undo(){
   $("ai-undo").disabled=true;aiMsg("Terugdraaien…");
-  try{const r=await api("api/assistant/undo",{});await loadTrip();renderAll();await loadHistory();aiMsg(`Teruggedraaid: "${r.prompt}"`)}
-  catch(err){aiMsg(err.message,true)}
-  finally{$("ai-undo").disabled=false}
+  try{const r=await api("api/assistant/undo",{});reloadWith(`Teruggedraaid: "${r.prompt}"`)}
+  catch(err){aiMsg(err.message,true);$("ai-undo").disabled=false}
 }
 $("ai-form").addEventListener("submit",makeProposal);
 $("ai-undo").addEventListener("click",undo);
 $("ai-ex").addEventListener("click",e=>{if(e.target.tagName==="BUTTON"){$("ai-prompt").value=e.target.textContent;$("ai-prompt").focus()}});
+let aiEnabled=false;
 fetch("api/assistant/status").then(r=>r.json()).then(s=>{
-  if(s.enabled){loadHistory();return}
+  if(s.enabled){aiEnabled=true;loadHistory();loadOpen();return}
   $("ai-off").hidden=false;$("ai-off").textContent="Aanpassen staat uit: "+s.reason;$("ai-form").hidden=true;
 }).catch(()=>{});
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")loadTrip().then(()=>{drawCheck()}).catch(()=>{})});
+// Melding van vóór de verversing tonen
+try{const m=sessionStorage.getItem("thai27-msg");if(m){sessionStorage.removeItem("thai27-msg");aiMsg(m)}}catch(e){}
+
+// ---------- Andere apparaten bijwerken ----------
+// Elke 30 seconden (als de app zichtbaar is) checken of de gegevens elders zijn gewijzigd.
+let dataVersie=null;
+async function checkVersie(){
+  if(document.visibilityState!=="visible")return;
+  try{
+    const {versie}=await api("api/versie");
+    if(dataVersie&&versie!==dataVersie){
+      await loadTrip();renderAll();
+      if(aiEnabled){loadHistory();loadOpen()}
+    }
+    dataVersie=versie;
+  }catch(e){}
+}
+checkVersie();
+setInterval(checkVersie,30000);
+document.addEventListener("visibilitychange",checkVersie);
 </script>
 </body>
 </html>

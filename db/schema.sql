@@ -63,3 +63,17 @@ create table if not exists checklist (
   done        boolean not null default false,
   updated_at  timestamptz not null default now()
 );
+
+-- Voorstellen uit het tabblad Aanpassen (ook als ze nog niet zijn toegepast)
+-- status: open, toegepast, geannuleerd, vervangen (door een nieuwer voorstel), uitleg (Claude stelde niets voor)
+create table if not exists voorstellen (
+  id             serial primary key,
+  prompt         text not null,
+  samenvatting   text,
+  wijzigingen    jsonb not null default '[]',
+  beschrijving   jsonb not null default '[]',
+  status         text not null default 'open',
+  change_log_id  int,
+  created_at     timestamptz not null default now(),
+  decided_at     timestamptz
+);

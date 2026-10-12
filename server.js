@@ -173,9 +173,13 @@ app.post("/api/assistant/propose", requireAssistant, (req, res, next) => {
   if (!underLimit()) return res.status(429).json({ error: "Je hebt het maximum van 30 voorstellen per uur bereikt." });
   next();
 }, handle((req) => assistant.propose(req.body?.prompt)));
-app.post("/api/assistant/apply", requireAssistant, handle((req) =>
-  assistant.apply(req.body?.prompt, req.body?.samenvatting, req.body?.wijzigingen)));
+app.get("/api/assistant/open", requireAssistant, handle(() => assistant.openProposal()));
+app.post("/api/assistant/apply", requireAssistant, handle((req) => assistant.applyProposal(req.body?.id)));
+app.post("/api/assistant/cancel", requireAssistant, handle((req) => assistant.cancel(req.body?.id)));
 app.post("/api/assistant/undo", requireAssistant, handle(() => assistant.undoLast()));
+
+// Versie van de gegevens: de app vraagt dit elke 30 seconden op en ververst als het verandert
+app.get("/api/versie", handle(async () => ({ versie: await assistant.dataVersion() })));
 
 app.use(express.static(path.join(__dirname, "public"), { maxAge: "7d", index: "index.html" }));
 

@@ -9,7 +9,7 @@ Node/Express-app op Render, met de reisgegevens in Neon (Postgres).
 |---|---|
 | `server.js` | Express-server: serveert de app en de API |
 | `assistant.js` | Aanpassen via prompts: Claude-voorstel, controle, toepassen, terugdraaien |
-| `db/schema.sql` | Tabellen: `bases`, `days`, `legs`, `checklist`, `kaart`, `change_log` |
+| `db/schema.sql` | Tabellen: `bases`, `days`, `legs`, `checklist`, `kaart`, `voorstellen`, `change_log` |
 | `db/migraties/` | Latere wijzigingen in de reisgegevens; elk bestand wordt bij het opstarten één keer uitgevoerd |
 | `db/kaart-seed.sql` | Routelijn, tussenstops en dagtrips voor de kaart |
 | `db/seed.sql` | Alle reisgegevens (overnachtingen, dagprogramma, ritten, reserveringen) |
@@ -24,7 +24,10 @@ Node/Express-app op Render, met de reisgegevens in Neon (Postgres).
 | `GET /api/trip` | Alle reisgegevens in één JSON |
 | `PATCH /api/checklist/:id` | Reservering afvinken, body `{ "done": true }` |
 | `POST /api/assistant/propose` | Voorstel laten maken, body `{ "prompt": "..." }` |
-| `POST /api/assistant/apply` | Voorstel toepassen |
+| `GET /api/assistant/open` | Het open voorstel (na verversen) |
+| `POST /api/assistant/apply` | Opgeslagen voorstel toepassen, body `{ "id": 12 }` |
+| `POST /api/assistant/cancel` | Voorstel annuleren, body `{ "id": 12 }` |
+| `GET /api/versie` | Versie van de gegevens, voor automatisch verversen |
 | `POST /api/assistant/undo` | Laatste wijziging terugdraaien |
 | `GET /api/assistant/history` | Laatste 15 wijzigingen |
 | `GET /healthz` | Health check voor Render |
@@ -68,8 +71,9 @@ Typ in gewone taal wat er moet veranderen, bijvoorbeeld:
 Zo werkt het:
 1. De server stuurt je vraag plus de huidige reisgegevens naar Claude.
 2. Claude doet een voorstel. Je ziet per wijziging de oude en nieuwe waarde.
-3. Pas na **Toepassen** wordt het in Neon opgeslagen.
-4. Elke wijziging komt in de tabel `change_log`. Met **Laatste wijziging terugdraaien** zet je hem terug, ook meerdere keren achter elkaar.
+3. Het voorstel wordt meteen opgeslagen (tabel `voorstellen`) en blijft staan als je de pagina ververst. Pas na **Toepassen** worden de reisgegevens aangepast; daarna ververst de pagina met de nieuwe gegevens.
+4. Andere geopende apparaten halen nieuwe gegevens binnen 30 seconden vanzelf op.
+5. Elke wijziging komt in de tabel `change_log`. Met **Laatste wijziging terugdraaien** zet je hem terug, ook meerdere keren achter elkaar.
 
 Wat Claude mag aanpassen:
 | Soort | Velden | Toevoegen/verwijderen |
