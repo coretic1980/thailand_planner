@@ -51,14 +51,15 @@ update legs set date_label = '6 feb' where sort = 2;
 update legs set date_label = '8 feb' where sort = 3;
 update legs set date_label = '10 feb' where sort = 4;
 
--- Reserveringen (alleen titel en toelichting; afgevinkt blijft afgevinkt)
-update checklist set note = 'Ophalen 4 feb, inleveren 16 feb avond of 17 feb vroeg', updated_at = now() where id = 'car';
-update checklist set title = 'ARUN Riverside, Bangkok, 3–4 feb', note = 'Vanaf 2 feb boeken, dan kun je direct inchecken', updated_at = now() where id = 'h1';
-update checklist set title = 'Prachuap Khiri Khan, 4–6 feb', note = 'Vroeg boeken: Chinees Nieuwjaar valt op 6 feb', updated_at = now() where id = 'h2';
-update checklist set title = 'Moonrise Villa, Chumphon, 6–8 feb', updated_at = now() where id = 'chp';
-update checklist set title = 'Hotel Khao Sok & Spa, 8–10 feb', updated_at = now() where id = 'h3';
-update checklist set title = 'The Tubkaak, Krabi, 10–13 feb', updated_at = now() where id = 'h4';
-update checklist set title = 'Olifantensafari Kui Buri, 5 feb', updated_at = now() where id = 'kui';
-update checklist set title = 'Snorkeltrip Mu Ko Chumphon, 7 feb', updated_at = now() where id = 'snork';
-update checklist set title = 'Klimcursus Railay, 11 feb', updated_at = now() where id = 'climb';
-update checklist set title = 'Tickets Muay Thai, 3 feb', updated_at = now() where id = 'muay';
+-- Reserveringen: alleen de datums in titel en toelichting vervangen.
+-- Hotelnamen, eigen notities en vinkjes blijven staan.
+update checklist set title = replace(title, '3–5 feb', '3–4 feb'), updated_at = now() where id = 'h1';
+update checklist set title = replace(title, '5–7 feb', '4–6 feb'), updated_at = now() where id = 'h2';
+update checklist set title = replace(title, '7–9 feb', '6–8 feb'), updated_at = now() where id = 'chp';
+update checklist set title = replace(title, '9–11 feb', '8–10 feb'), updated_at = now() where id = 'h3';
+update checklist set title = replace(title, '11–13 feb', '10–13 feb'), updated_at = now() where id = 'h4';
+update checklist set title = replace(title, '6 feb', '5 feb'), updated_at = now() where id = 'kui';
+update checklist set title = replace(title, '8 feb', '7 feb'), updated_at = now() where id = 'snork';
+update checklist set title = replace(title, '12 feb', '11 feb'), updated_at = now() where id = 'climb';
+update checklist set title = replace(title, '4 feb', '3 feb'), updated_at = now() where id = 'muay';
+update checklist set note = replace(note, 'Ophalen 5 feb', 'Ophalen 4 feb'), updated_at = now() where id = 'car';
