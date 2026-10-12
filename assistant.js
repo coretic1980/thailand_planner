@@ -210,6 +210,7 @@ Regels:
 - Foto's: kies alleen uit ${PHOTOS.join(", ")}, of null.
 - Houd de stijl van de bestaande teksten aan: kort, Nederlands, geen emoji.
 - Als iets in het verzoek niet kan of onduidelijk is, geef dan een lege lijst wijzigingen en leg in de samenvatting uit wat je nodig hebt.
+- Roep altijd het hulpmiddel "voorstel" aan, ook als er niets te wijzigen valt (dan met een lege lijst wijzigingen).
 - Verander nooit iets waar de gebruiker niet om vraagt. Als een verzoek ook een andere dag raakt (bijvoorbeeld iets verplaatsen), pas dan beide dagen aan.
 
 Huidige gegevens (JSON):
@@ -234,8 +235,8 @@ async function callClaude(prompt, data) {
         max_tokens: 4000,
         system: systemPrompt(data),
         tools: [TOOL],
-        tool_choice: { type: "tool", name: "voorstel" },
-        messages: [{ role: "user", content: prompt }],
+        tool_choice: { type: "auto" },
+        messages: [{ role: "user", content: prompt + "\n\nAntwoord door het hulpmiddel \"voorstel\" aan te roepen." }],
       }),
     });
   } catch (e) {
@@ -252,8 +253,18 @@ async function callClaude(prompt, data) {
   }
   const json = await res.json();
   const block = (json.content || []).find((b) => b.type === "tool_use" && b.name === "voorstel");
-  if (!block) throw new UserError("Claude gaf geen bruikbaar voorstel. Probeer je vraag anders te formuleren.");
-  return block.input;
+  if (block) return block.input;
+  // Terugval: Claude antwoordde met tekst. Zoek daarin een JSON-voorstel, anders toon de uitleg.
+  const text = (json.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+  const a = text.indexOf("{"), z = text.lastIndexOf("}");
+  if (a >= 0 && z > a) {
+    try {
+      const parsed = JSON.parse(text.slice(a, z + 1));
+      if (parsed && Array.isArray(parsed.wijzigingen)) return parsed;
+    } catch (_) { /* geen geldige JSON */ }
+  }
+  if (text) return { samenvatting: text.slice(0, 600), wijzigingen: [] };
+  throw new UserError("Claude gaf geen bruikbaar voorstel. Probeer je vraag anders te formuleren.");
 }
 
 // ---------- Publieke functies ----------
