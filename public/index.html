@@ -265,7 +265,7 @@ function drawTrips(){
   if(!t){box.hidden=true;box.innerHTML="";return}
   const heeftDag=t.dag&&DAYS.some(d=>d.iso===t.dag);
   box.innerHTML=`<span class="chip">${esc(dagLabel(t.dag)||"Onderweg")}</span>${t.soort==="stop"?'<span class="chip">stop onderweg</span>':""}
-   <h3>${t.nr}. ${esc(t.naam)}</h3><p>${esc(t.tekst)}</p>
+   <h3>${t.nr}. ${esc(t.naam)}</h3>${t.foto?`<img class="zoom" src="img/${esc(t.foto)}.jpg" alt="${esc(t.naam)}" data-cap="${esc(t.naam)}" loading="lazy" style="width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:10px;margin:4px 0 8px">`:""}<p>${esc(t.tekst)}</p>
    <div class="links">${heeftDag?`<a href="#" id="naar-dag">Bekijk het dagprogramma →</a>`:""}<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(t.naam+" Thailand")}" target="_blank" rel="noopener">Google Maps ↗</a><a href="#" id="sluit-info">Sluiten</a></div>`;
   box.hidden=false;
   const nd=document.getElementById("naar-dag");if(nd)nd.addEventListener("click",e=>{e.preventDefault();show("dagen");setTimeout(()=>{const el=document.getElementById("d-"+t.dag);if(el)el.scrollIntoView({behavior:"smooth",block:"start"})},50)});
