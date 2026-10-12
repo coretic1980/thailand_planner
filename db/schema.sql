@@ -77,3 +77,14 @@ create table if not exists voorstellen (
   created_at     timestamptz not null default now(),
   decided_at     timestamptz
 );
+
+-- Vaste teksten: kop van de pagina, vluchten, praktische info, noodnummers, Thaise woorden, fotocredits
+-- sectie: algemeen, vlucht, praktisch, nood, woorden
+create table if not exists info (
+  id      text primary key,
+  sectie  text not null,
+  sort    int  not null,
+  label   text not null,
+  waarde  text,
+  tekst   text
+);

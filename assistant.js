@@ -28,12 +28,20 @@ const ENTITIES = {
     table: "checklist", key: "id", label: "Reservering",
     fields: { title: "text", note: "textnull", done: "bool" },
   },
+  info: {
+    table: "info", key: "id", label: "Info",
+    fields: { sectie: "sectie", label: "text", waarde: "textnull", tekst: "textlong" },
+  },
 };
+// Bij info kun je regels toevoegen en verwijderen, behalve in de sectie "algemeen"
+const INFO_SECTIES = ["vlucht", "praktisch", "nood", "woorden"];
+const ADD_REMOVE = ["reservering", "info"];
 const FIELD_LABELS = {
   title: "titel", drive: "rijtijd", items: "programma", photo: "foto", name: "naam", dates: "data",
   nights: "nachten", hotel: "hotel", alternative: "alternatief", why: "beschrijving", todo: "activiteiten",
   date_label: "datum", route: "route", duration: "duur", note: "toelichting", done: "geregeld",
   lat: "breedtegraad", lon: "lengtegraad", links: "label links", tussenstops: "tussenstops", dagtrips: "dagtrips",
+  hotel_url: "link hotel", hotel_foto: "foto hotel", sectie: "sectie", label: "onderwerp", waarde: "waarde", tekst: "tekst",
 };
 // Het gebied dat de kaart toont (Zuid-Thailand)
 const BOUNDS = { latMin: 7.5, latMax: 14.2, lonMin: 97.5, lonMax: 101.2 };
@@ -66,6 +74,10 @@ function cleanValue(type, v) {
   switch (type) {
     case "text": return text(v, 300);
     case "textnull": return v === null || v === "" ? null : text(v, 300);
+    case "textlong": return v === null || v === "" ? null : text(v, 1000);
+    case "sectie":
+      if (!INFO_SECTIES.includes(v)) throw new UserError(`Onbekende sectie: ${v}`);
+      return v;
     case "list":
       if (!Array.isArray(v) || v.length > 10) throw new UserError("Ongeldige lijst in het voorstel.");
       return v.map((x) => text(x, 200));
@@ -116,8 +128,8 @@ function cleanChange(c) {
   if (!ent) throw new UserError(`Onbekend soort: ${c.soort}`);
   const actie = c.actie;
   if (!["wijzigen", "toevoegen", "verwijderen"].includes(actie)) throw new UserError(`Onbekende actie: ${actie}`);
-  if (actie !== "wijzigen" && c.soort !== "reservering") {
-    throw new UserError("Toevoegen en verwijderen kan alleen bij reserveringen.");
+  if (actie !== "wijzigen" && !ADD_REMOVE.includes(c.soort)) {
+    throw new UserError("Toevoegen en verwijderen kan alleen bij reserveringen en info.");
   }
   const out = { actie, soort: c.soort, sleutel: c.sleutel == null ? null : String(c.sleutel), velden: {} };
   if (actie !== "toevoegen" && !out.sleutel) throw new UserError("Wijziging zonder sleutel.");
@@ -128,7 +140,17 @@ function cleanChange(c) {
     if (!ent.fields[k]) throw new UserError(`Veld ${k} kan niet worden aangepast.`);
     out.velden[k] = cleanValue(ent.fields[k], v);
   }
-  if (actie === "toevoegen" && !out.velden.title) throw new UserError("Een nieuwe reservering heeft een titel nodig.");
+  if (actie === "toevoegen" && c.soort === "reservering" && !out.velden.title) throw new UserError("Een nieuwe reservering heeft een titel nodig.");
+  if (c.soort === "info") {
+    if (actie === "toevoegen" && (!out.velden.sectie || !out.velden.label)) throw new UserError("Nieuwe info heeft een sectie en een onderwerp nodig.");
+    if (actie === "wijzigen" && "sectie" in out.velden) throw new UserError("De sectie van bestaande info kan niet veranderen.");
+    // Een paar vaste waarden moeten in een bepaald formaat
+    if (out.sleutel === "hero_foto" && "waarde" in out.velden) out.velden.waarde = cleanValue("photo", out.velden.waarde);
+    if (["reis_start", "reis_einde"].includes(out.sleutel) && "waarde" in out.velden
+        && !/^2027-02-\d\dT\d\d:\d\d:00\+07:00$/.test(out.velden.waarde || "")) {
+      throw new UserError("Begin en einde van de reis noteer je als 2027-02-03T06:35:00+07:00.");
+    }
+  }
   if (!Object.keys(out.velden).length) throw new UserError("Wijziging zonder velden.");
   return out;
 }
@@ -148,6 +170,7 @@ async function snapshot() {
     ritten: await q("select sort::text as sleutel, date_label, route, duration from legs order by sort"),
     reserveringen: await q("select id as sleutel, title, note, done from checklist order by sort"),
     kaart: (await q("select id as sleutel, route, tussenstops, dagtrips from kaart"))[0] || null,
+    info: await q("select id as sleutel, sectie, label, waarde, tekst from info order by sectie, sort, id"),
   };
 }
 
@@ -160,11 +183,14 @@ const fmt = (v) => (v === null || v === undefined || v === "" ? "(leeg)"
 async function describe(change) {
   const ent = ENTITIES[change.soort];
   if (change.actie === "toevoegen") {
+    if (change.soort === "info") {
+      return { titel: `Nieuwe info (${change.velden.sectie}): ${change.velden.label}`, regels: [change.velden.waarde, change.velden.tekst].filter(Boolean) };
+    }
     return { titel: `Nieuwe reservering: ${change.velden.title}`, regels: change.velden.note ? [`toelichting: ${change.velden.note}`] : [] };
   }
   const row = await getRow(db, ent, change.sleutel);
   if (!row) throw new UserError(`${ent.label} "${change.sleutel}" bestaat niet.`);
-  const naam = change.soort === "kaart" ? "routelijn, tussenstops en dagtrips" : (row.title || row.name || row.route || change.sleutel);
+  const naam = change.soort === "kaart" ? "routelijn, tussenstops en dagtrips" : (row.title || row.name || row.label || row.route || change.sleutel);
   const wie = change.soort === "dag" ? `${ent.label} ${change.sleutel} (${naam})` : `${ent.label}: ${naam}`;
   if (change.actie === "verwijderen") return { titel: `Verwijderen: ${wie}`, regels: [] };
   const regels = [];
@@ -194,7 +220,7 @@ const TOOL = {
           type: "object",
           properties: {
             actie: { type: "string", enum: ["wijzigen", "toevoegen", "verwijderen"] },
-            soort: { type: "string", enum: ["dag", "overnachting", "rit", "kaart", "reservering"] },
+            soort: { type: "string", enum: ["dag", "overnachting", "rit", "kaart", "reservering", "info"] },
             sleutel: { type: ["string", "null"], description: "De 'sleutel' uit de huidige gegevens; null bij toevoegen." },
             velden: { type: "object", description: "Alleen de velden die veranderen, met hun complete nieuwe waarde." },
           },
@@ -212,8 +238,9 @@ De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulp
 
 Regels:
 - Gebruik alleen de sleutels uit de huidige gegevens hieronder.
-- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done).
-- Toevoegen en verwijderen kan alleen bij reserveringen. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
+- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done), info (label, waarde, tekst).
+- Toevoegen en verwijderen kan alleen bij reserveringen en info. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
+- Info is de rest van de app: de kop van de pagina en de teller (sectie "algemeen": hero_label, hero_titel, hero_tekst, hero_foto met het onderschrift in tekst, reis_start, reis_einde, reisdagen, afstand, en de fotocredits in "fotos"), de vluchten (sectie "vlucht": label, waarde = tijd, tekst = regels gescheiden door \\n), praktische info (sectie "praktisch": label en tekst), noodnummers (sectie "nood": label, waarde = nummer, tekst = opmerking) en Thaise woorden (sectie "woorden": label = Nederlands, tekst = Thais). Een nieuwe info-regel geeft je met actie "toevoegen", sleutel null en velden sectie (vlucht, praktisch, nood of woorden), label en tekst of waarde. Regels in de sectie "algemeen" kun je wijzigen, niet toevoegen of verwijderen.
 - De kaart: "route" is de rode lijn, in reisvolgorde, van vliegveld tot vliegveld, inclusief de overnachtingsplekken. "tussenstops" zijn plekken op de route waar je niet slaapt, "dagtrips" zijn uitstapjes vanaf een overnachting. Elk punt is {"naam","lat","lon"} met optioneel "links": true als het label links van de pin moet (bijvoorbeeld als het rechts tegen een ander label aan zou staan). Lijsten geef je altijd compleet terug.
 - Verandert de route (een andere overnachtingsplek, een extra stop of een omweg), pas dan in één voorstel alles aan wat erbij hoort: de lat/lon van de overnachting, de kaart (route en eventueel tussenstops of dagtrips), de ritten en het dagprogramma.
 - Coördinaten: gebruik de echte ligging van de plek in decimale graden. De kaart toont alleen Zuid-Thailand (breedtegraad ${BOUNDS.latMin}–${BOUNDS.latMax}, lengtegraad ${BOUNDS.lonMin}–${BOUNDS.lonMax}); een plek daarbuiten kan niet, leg dat dan uit.
@@ -228,6 +255,7 @@ Regels:
   - De data van overnachtingen sluiten op elkaar aan: de vertrekdatum van de ene is de aankomstdatum van de volgende. Het aantal nachten klopt met de data. De reis zelf ligt vast op 3–17 februari 2027.
   - Schuift een overnachting op, pas dan ook het dagprogramma aan (de reisdag "Naar …" met rijtijd valt op de aankomstdatum), de ritten (date_label) en de reserveringen met een datum erin.
   - Wordt een activiteit verplaatst, haal hem dan weg bij de oude dag en zet hem bij de nieuwe dag. Staat er een reservering voor, pas daar de datum aan.
+  - De info moet kloppen met de route: de huurauto (ophaal- en inleverdag en -plek), Chinees Nieuwjaar (welke rit op 6 feb valt en of dat hotel geregeld is), de maximale rijtijd in hero_tekst, de vluchten en de afstand. Verandert iets daaraan, pas de info dan mee aan.
   - Eigen notities van de gebruiker (prijzen, annuleringsvoorwaarden, boekingsnummers) laat je staan, tenzij de gebruiker vraagt ze te veranderen.
 - Verander niets wat niet met het verzoek te maken heeft.
 
@@ -351,6 +379,16 @@ async function applyChanges(client, prompt, summary, changes) {
     const log = [];
     for (const c of clean) {
       const ent = ENTITIES[c.soort];
+      if (c.actie === "toevoegen" && c.soort === "info") {
+        const id = "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const { rows } = await client.query("select coalesce(max(sort),0)+1 as s from info where sectie = $1", [c.velden.sectie]);
+        await client.query(
+          "insert into info (id, sectie, sort, label, waarde, tekst) values ($1,$2,$3,$4,$5,$6)",
+          [id, c.velden.sectie, rows[0].s, c.velden.label, c.velden.waarde ?? null, c.velden.tekst ?? null]
+        );
+        log.push({ table: ent.table, key: ent.key, keyValue: id, before: null });
+        continue;
+      }
       if (c.actie === "toevoegen") {
         const id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const { rows } = await client.query("select coalesce(max(sort),0)+1 as s from checklist");
@@ -363,6 +401,9 @@ async function applyChanges(client, prompt, summary, changes) {
       }
       const before = await getRow(client, ent, c.sleutel);
       if (!before) throw new UserError(`${ent.label} "${c.sleutel}" bestaat niet (meer).`);
+      if (c.soort === "info" && c.actie === "verwijderen" && before.sectie === "algemeen") {
+        throw new UserError(`"${before.label}" kan niet worden verwijderd, alleen gewijzigd.`);
+      }
       if (c.actie === "verwijderen") {
         await client.query(`delete from ${ent.table} where ${ent.key}::text = $1`, [c.sleutel]);
       } else {

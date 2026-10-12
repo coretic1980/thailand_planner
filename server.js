@@ -92,12 +92,13 @@ app.use((req, res, next) => {
 // Alle reisgegevens in één keer
 app.get("/api/trip", async (_req, res, next) => {
   try {
-    const [bases, days, legs, check, kaart] = await Promise.all([
+    const [bases, days, legs, check, kaart, info] = await Promise.all([
       db.query("select * from bases order by nr"),
       db.query("select to_char(day_date,'YYYY-MM-DD') as iso, * from days order by day_date"),
       db.query("select * from legs order by sort"),
       db.query("select * from checklist order by sort"),
       db.query("select route, tussenstops, dagtrips from kaart where id = 'kaart'"),
+      db.query("select id, sectie, label, waarde, tekst from info order by sectie, sort, id"),
     ]);
     const k = kaart.rows[0] || { route: [], tussenstops: [], dagtrips: [] };
     res.set("Cache-Control", "no-store");
@@ -118,6 +119,7 @@ app.get("/api/trip", async (_req, res, next) => {
         id: c.id, title: c.title, note: c.note, done: c.done,
         updatedAt: c.updated_at,
       })),
+      info: info.rows,
     });
   } catch (e) {
     next(e);

@@ -131,11 +131,11 @@ img{max-width:100%}
 
 <div class="wrap">
   <header class="hero">
-    <div class="eyebrow">Gezinsreis · 3–17 februari 2027</div>
-    <h1>Bangkok → Phuket</h1>
-    <p class="sub">Roadtrip langs de Golf en de Andamanzee, 5 overnachtingsplekken, maximaal ongeveer 5,5 uur rijden per dag.</p>
+    <div class="eyebrow" id="hero-label">Gezinsreis</div>
+    <h1 id="hero-titel">Thailand</h1>
+    <p class="sub" id="hero-tekst"></p>
     <div class="count" id="count"></div>
-    <img class="hero-img zoom" src="img/13-samet-nangshe.jpg" alt="Uitzicht over de kalkrotsen van Phang Nga Bay" data-cap="Phang Nga Bay">
+    <img class="hero-img zoom" id="hero-img" src="img/13-samet-nangshe.jpg" alt="Phang Nga Bay" data-cap="Phang Nga Bay">
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Onderdelen">
@@ -181,36 +181,15 @@ img{max-width:100%}
 
   <section id="info" role="tabpanel" hidden>
     <h2>Vluchten</h2>
-    <div class="flight">
-      <div class="fl"><div class="lab">Heen · landing</div><div class="big">06:35</div>Wo 3 feb · EY402 Etihad<br>Suvarnabhumi, Bangkok</div>
-      <div class="fl"><div class="lab">Terug · vertrek</div><div class="big">08:45</div>Wo 17 feb · EY429 Etihad<br>Phuket International (om 06:45 aanwezig)</div>
-    </div>
+    <div class="flight" id="info-vlucht"></div>
     <h2>Praktisch</h2>
-    <table class="tbl">
-      <tr><td>Rijbewijs</td><td>Internationaal rijbewijs (ANWB) plus je Nederlandse rijbewijs. Links rijden.</td></tr>
-      <tr><td>Huurauto</td><td>Ophalen 4 feb in Bangkok, inleveren Phuket Airport. Vraag naar de toeslag voor inleveren op een andere plek en of de balie op 16 feb 's avonds open is.</td></tr>
-      <tr><td>Chinees Nieuwjaar</td><td>Za 6 feb 2027, de dag van de rit naar Chumphon. Druk en duurder langs de kust; boek Chumphon op tijd.</td></tr>
-      <tr><td>Weer</td><td>Droog seizoen aan beide kusten, rond 32 °C overdag.</td></tr>
-      <tr><td>Nationale parken</td><td>Entree meestal contant betalen. Check openingsdata van de Surin-eilanden vlak voor vertrek.</td></tr>
-      <tr><td>Geld</td><td>Thaise baht. Veel stalletjes, parken en kleine hotels accepteren alleen contant geld.</td></tr>
-      <tr><td>Stroom</td><td>230 V. Nederlandse stekkers passen meestal, een wereldstekker is handig.</td></tr>
-    </table>
+    <table class="tbl" id="info-praktisch"></table>
     <h2>Noodnummers</h2>
-    <table class="tbl">
-      <tr><td>Toeristenpolitie</td><td><b>1155</b> (Engelstalig)</td></tr>
-      <tr><td>Ambulance</td><td><b>1669</b></td></tr>
-      <tr><td>Politie</td><td><b>191</b></td></tr>
-      <tr><td>Brandweer</td><td><b>199</b></td></tr>
-    </table>
+    <table class="tbl" id="info-nood"></table>
     <h2>Handige Thaise woorden</h2>
-    <table class="tbl">
-      <tr><td>Hallo / dank je</td><td>sawasdee khrap (m) / kha (v) · khop khun khrap / kha</td></tr>
-      <tr><td>Niet pittig</td><td>mai phet</td></tr>
-      <tr><td>Hoeveel kost het?</td><td>tao rai?</td></tr>
-      <tr><td>Lekker!</td><td>aroi!</td></tr>
-    </table>
+    <table class="tbl" id="info-woorden"></table>
     <h2>Foto's</h2>
-    <p class="note">Alle foto's komen van Unsplash. Met dank aan Anantachai Saothong, Vasant Jain, Udee Manmin, Jean Carlo Emer, allPhoto Bangkok, Audrey Langlois, Rock Vincent Guitard, Robin Noguier, Aleksandra B., Steven Watson, Simon Pallard, Martti Salmi, Sven, Dario Brönnimann, Jo Barnes en de fotografen van de foto's van Chumphon en Khao Sok.</p>
+    <p class="note" id="info-fotos"></p>
     <p style="margin-top:24px"><a id="logout" class="ghost" href="logout" style="display:inline-block;text-decoration:none">Uitloggen</a></p>
   </section>
 
@@ -238,7 +217,7 @@ img{max-width:100%}
 </div>
 
 <script>
-let BASES=[],DAYS=[],LEGS=[],CHECK=[],KAART={route:[],tussenstops:[],dagtrips:[]};
+let BASES=[],DAYS=[],LEGS=[],CHECK=[],INFO=[],KAART={route:[],tussenstops:[],dagtrips:[]};
 
 const X=lon=>(lon-97.5)*100, Y=lat=>(14.2-lat)*100;
 const LAND=[[98.2,14.2],[101.2,14.2],[101.2,12.7],[100.95,12.65],[100.9,12.95],[100.95,13.35],[100.6,13.5],[100.3,13.48],[100.0,13.35],[99.98,12.8],[99.97,12.55],[100.0,12.2],[99.82,11.8],[99.55,11.2],[99.25,10.5],[99.15,9.95],[99.25,9.4],[99.35,9.15],[99.85,9.25],[100.05,8.4],[100.35,7.75],[100.45,7.5],[99.55,7.5],[99.1,7.8],[98.9,8.05],[98.75,8.0],[98.6,8.3],[98.45,8.25],[98.3,8.2],[98.27,8.65],[98.32,9.2],[98.5,9.7],[98.62,10.0],[98.55,10.8],[98.6,11.5],[98.6,12.4],[98.4,13.2]];
@@ -305,12 +284,30 @@ async function toggle(id,done){
   }catch(e){item.done=before;drawCheck();setSync("Opslaan mislukt. Controleer je internetverbinding en probeer het opnieuw.",true)}
 }
 function setSync(t,err){const el=document.getElementById("sync");el.textContent=t;el.style.color=err?"var(--sun)":"var(--muted)"}
+const infoRow=id=>INFO.find(r=>r.id===id)||{};
+const infoVal=(id,def)=>infoRow(id).waarde||def;
 function drawCount(){
-  const start=new Date("2027-02-03T06:35:00+07:00"),end=new Date("2027-02-17T08:45:00+07:00"),now=new Date();
+  const start=new Date(infoVal("reis_start","2027-02-03T06:35:00+07:00")),end=new Date(infoVal("reis_einde","2027-02-17T08:45:00+07:00")),now=new Date();
+  const dagen=esc(infoVal("reisdagen","15")),km=infoVal("afstand","");
   const el=document.getElementById("count");
-  if(now<start){const d=Math.ceil((start-now)/864e5);el.innerHTML=`<div><b>${d}</b> <span>dagen tot vertrek</span></div><div><b>15</b> <span>dagen</span></div><div><b>${BASES.length||"–"}</b> <span>overnachtingsplekken</span></div><div><b>±1.100</b> <span>km</span></div>`}
-  else if(now<end){const d=Math.floor((now-start)/864e5)+1;el.innerHTML=`<div><b>Dag ${d}</b> <span>van 15</span></div>`}
+  if(now<start){const d=Math.ceil((start-now)/864e5);el.innerHTML=`<div><b>${d}</b> <span>dagen tot vertrek</span></div><div><b>${dagen}</b> <span>dagen</span></div><div><b>${BASES.length||"–"}</b> <span>overnachtingsplekken</span></div>${km?`<div><b>${esc(km)}</b> <span>km</span></div>`:""}`}
+  else if(now<end){const d=Math.floor((now-start)/864e5)+1;el.innerHTML=`<div><b>Dag ${d}</b> <span>van ${dagen}</span></div>`}
   else el.innerHTML=`<div><b>Thuis</b> <span>hopelijk met mooie herinneringen</span></div>`;
+}
+function drawInfo(){
+  if(!INFO.length)return;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
+  set("hero-label",infoVal("hero_label",""));set("hero-titel",infoVal("hero_titel",""));set("hero-tekst",infoVal("hero_tekst",""));
+  const hf=infoRow("hero_foto"),img=document.getElementById("hero-img");
+  if(img&&hf.waarde){img.src="img/"+hf.waarde+".jpg";img.alt=hf.tekst||"";img.dataset.cap=hf.tekst||""}
+  const of=s=>INFO.filter(r=>r.sectie===s);
+  const br=t=>esc(t).replace(/\n/g,"<br>");
+  document.getElementById("info-vlucht").innerHTML=of("vlucht").map(r=>`<div class="fl"><div class="lab">${esc(r.label)}</div><div class="big">${esc(r.waarde)}</div>${br(r.tekst)}</div>`).join("");
+  const tbl=(id,rows,cell)=>{document.getElementById(id).innerHTML=rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${cell(r)}</td></tr>`).join("")};
+  tbl("info-praktisch",of("praktisch"),r=>br(r.tekst||r.waarde));
+  tbl("info-nood",of("nood"),r=>`<b>${esc(r.waarde)}</b>${r.tekst?` (${esc(r.tekst)})`:""}`);
+  tbl("info-woorden",of("woorden"),r=>esc(r.tekst||r.waarde));
+  set("info-fotos",infoRow("fotos").tekst||"");
 }
 function show(tab){
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===tab?"true":"false"));
@@ -327,9 +324,9 @@ async function loadTrip(){
   const r=await fetch("api/trip",{cache:"no-store"});
   if(!r.ok)throw new Error(r.status);
   const d=await r.json();
-  BASES=d.bases;DAYS=d.days;LEGS=d.legs;CHECK=d.checklist;KAART=d.kaart||KAART;
+  BASES=d.bases;DAYS=d.days;LEGS=d.legs;CHECK=d.checklist;KAART=d.kaart||KAART;INFO=d.info||[];
 }
-function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawCheck();drawCount()}
+function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawCheck();drawInfo();drawCount()}
 const h=(location.hash||"").slice(1);
 let startTab="route";try{startTab=localStorage.getItem("thai27-tab")||"route"}catch(e){}
 if(["route","dagen","plekken","check","info","edit"].includes(h))startTab=h;
