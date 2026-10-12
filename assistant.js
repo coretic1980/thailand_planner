@@ -14,7 +14,7 @@ const ENTITIES = {
   },
   overnachting: {
     table: "bases", key: "id", label: "Overnachting",
-    fields: { name: "text", dates: "text", nights: "text", hotel: "text", alternative: "textnull", why: "textnull", todo: "list", lat: "lat", lon: "lon", links: "bool", hotel_url: "url", hotel_foto: "photo" },
+    fields: { name: "text", dates: "text", nights: "text", hotel: "text", alternative: "textnull", why: "textnull", todo: "list", lat: "lat", lon: "lon", links: "bool", hotel_url: "url", hotel_foto: "photo", prijs: "prijs" },
   },
   rit: {
     table: "legs", key: "sort", label: "Rit",
@@ -41,7 +41,7 @@ const FIELD_LABELS = {
   nights: "nachten", hotel: "hotel", alternative: "alternatief", why: "beschrijving", todo: "activiteiten",
   date_label: "datum", route: "route", duration: "duur", note: "toelichting", done: "geregeld",
   lat: "breedtegraad", lon: "lengtegraad", links: "label links", tussenstops: "tussenstops", dagtrips: "dagtrips",
-  hotel_url: "link hotel", hotel_foto: "foto hotel", sectie: "sectie", label: "onderwerp", waarde: "waarde", tekst: "tekst",
+  hotel_url: "link hotel", hotel_foto: "foto hotel", prijs: "prijs (€)", sectie: "sectie", label: "onderwerp", waarde: "waarde", tekst: "tekst",
 };
 // Het gebied dat de kaart toont (Zuid-Thailand)
 const BOUNDS = { latMin: 7.5, latMax: 14.2, lonMin: 97.5, lonMax: 101.2 };
@@ -75,6 +75,13 @@ function cleanValue(type, v) {
     case "text": return text(v, 300);
     case "textnull": return v === null || v === "" ? null : text(v, 300);
     case "textlong": return v === null || v === "" ? null : text(v, 1000);
+    case "prijs": {
+      if (v === null || v === "") return null;
+      const t = typeof v === "string" ? v.replace(/[€\s]/g, "") : null;
+      const n = t === null ? v : Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+      if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > 100000) throw new UserError("Ongeldige prijs in het voorstel.");
+      return Math.round(n * 100) / 100;
+    }
     case "sectie":
       if (!INFO_SECTIES.includes(v)) throw new UserError(`Onbekende sectie: ${v}`);
       return v;
@@ -166,7 +173,7 @@ async function snapshot() {
   const q = (sql) => db.query(sql).then((r) => r.rows);
   return {
     dagen: await q("select to_char(day_date,'YYYY-MM-DD') as sleutel, title, drive, items, photo from days order by day_date"),
-    overnachtingen: await q("select id as sleutel, name, dates, nights, hotel, alternative, why, todo, lat::float as lat, lon::float as lon, links, hotel_url, hotel_foto from bases order by nr"),
+    overnachtingen: await q("select id as sleutel, name, dates, nights, hotel, alternative, why, todo, lat::float as lat, lon::float as lon, links, hotel_url, hotel_foto, prijs::float as prijs from bases order by nr"),
     ritten: await q("select sort::text as sleutel, date_label, route, duration from legs order by sort"),
     reserveringen: await q("select id as sleutel, title, note, done from checklist order by sort"),
     kaart: (await q("select id as sleutel, route, tussenstops, dagtrips from kaart"))[0] || null,
@@ -238,7 +245,7 @@ De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulp
 
 Regels:
 - Gebruik alleen de sleutels uit de huidige gegevens hieronder.
-- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done), info (label, waarde, tekst).
+- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done), info (label, waarde, tekst).
 - Toevoegen en verwijderen kan alleen bij reserveringen en info. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
 - Info is de rest van de app: de kop van de pagina en de teller (sectie "algemeen": hero_label, hero_titel, hero_tekst, hero_foto met het onderschrift in tekst, reis_start, reis_einde, reisdagen, afstand, en de fotocredits in "fotos"), de vluchten (sectie "vlucht": label, waarde = tijd, tekst = regels gescheiden door \\n), praktische info (sectie "praktisch": label en tekst), noodnummers (sectie "nood": label, waarde = nummer, tekst = opmerking) en Thaise woorden (sectie "woorden": label = Nederlands, tekst = Thais). Een nieuwe info-regel geeft je met actie "toevoegen", sleutel null en velden sectie (vlucht, praktisch, nood of woorden), label en tekst of waarde. Regels in de sectie "algemeen" kun je wijzigen, niet toevoegen of verwijderen.
 - De kaart: "route" is de rode lijn, in reisvolgorde, van vliegveld tot vliegveld, inclusief de overnachtingsplekken. "tussenstops" zijn plekken op de route waar je niet slaapt, "dagtrips" zijn uitstapjes vanaf een overnachting. Elk punt is {"naam","lat","lon"} met optioneel "links": true als het label links van de pin moet (bijvoorbeeld als het rechts tegen een ander label aan zou staan). Lijsten geef je altijd compleet terug.
@@ -247,6 +254,7 @@ Regels:
 - Lijsten (items, todo) geef je altijd compleet terug, inclusief de punten die blijven staan.
 - Foto's (photo en hotel_foto): kies alleen uit ${PHOTOS.join(", ")}, of null.
 - hotel_url is de link naar de website of boekingspagina van het hotel (alleen https://). Verandert het hotel, zet hotel_url dan op null tenzij de gebruiker een link geeft; verzin geen links.
+- prijs is het totaalbedrag in euro voor het hele verblijf op die plek (alle kamers en nachten samen), als getal, bijvoorbeeld 298.2. De app telt de prijzen zelf op tot het totaal; zet het totaal dus nergens in een tekst. Verandert het hotel of het aantal nachten en noemt de gebruiker geen nieuwe prijs, zet prijs dan op null. Noemt de gebruiker een prijs, zet die dan in prijs en ook in de beschrijving (why) en de reservering, zoals bij de andere hotels.
 - Houd de stijl van de bestaande teksten aan: kort, Nederlands, geen emoji.
 - Als iets in het verzoek niet kan of onduidelijk is, geef dan een lege lijst wijzigingen en leg in de samenvatting uit wat je nodig hebt.
 - Roep altijd het hulpmiddel "voorstel" aan, ook als er niets te wijzigen valt (dan met een lege lijst wijzigingen).

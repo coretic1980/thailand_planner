@@ -109,6 +109,7 @@ app.get("/api/trip", async (_req, res, next) => {
         hotel: b.hotel, alt: b.alternative, why: b.why, todo: b.todo,
         q: b.unsplash_query, g: b.maps_query,
         img: [b.photo, b.photo_caption], gal: b.gallery || [], links: b.links, hotelUrl: b.hotel_url || null, hotelFoto: b.hotel_foto || null,
+        prijs: b.prijs == null ? null : Number(b.prijs),
       })),
       kaart: { route: k.route, tussenstops: k.tussenstops, dagtrips: k.dagtrips },
       days: days.rows.map((d) => ({

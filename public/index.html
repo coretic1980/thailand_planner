@@ -100,6 +100,11 @@ svg{display:block;width:100%;height:auto}
 .tbl td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}
 .tbl td:first-child{color:var(--muted);width:42%;padding-right:10px}
 .note{font-size:13px;color:var(--muted)}
+.kosten{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:4px 0 18px}
+.kosten .tot{font-size:22px;font-weight:800}
+.kosten .tbl td:first-child{width:auto}
+.kosten .tbl td:last-child{text-align:right;white-space:nowrap}
+.kosten .tbl tr.som td{font-weight:700;color:var(--fg);border-bottom:0}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 [hidden]{display:none!important}
 .ai{display:grid;gap:10px;margin-top:12px}
@@ -168,11 +173,13 @@ img{max-width:100%}
 
   <section id="plekken" role="tabpanel" hidden>
     <h2>Overnachtingen</h2>
+    <div class="kosten" id="kosten-plekken"></div>
     <div class="places" id="places"></div>
   </section>
 
   <section id="check" role="tabpanel" hidden>
     <h2>Reserveren</h2>
+    <div class="kosten" id="kosten-check"></div>
     <div class="prog"><i id="bar"></i></div>
     <p class="note" id="progtxt"></p>
     <ul class="check" id="checklist"></ul>
@@ -258,13 +265,27 @@ function drawPlaces(){
   document.getElementById("places").innerHTML=BASES.map(b=>`<article class="place" id="p-${b.id}">
    <div class="band${b.img&&b.img[0]?"":" nofoto"}">${b.img&&b.img[0]?`<img class="zoom" src="img/${esc(b.img[0])}.jpg" alt="${esc(b.img[1])}" data-cap="${esc(b.img[1])}" loading="lazy">`:""}<span class="num">${b.n}</span><span class="when">${b.dates}</span></div>
    <div class="in"><h3>${esc(b.name)}</h3>
-    <dl class="kv"><dt>Verblijf</dt><dd>${esc(b.nights)}</dd><dt>Hotel</dt><dd>${b.hotelFoto?`<img class="hotelfoto zoom" src="img/${esc(b.hotelFoto)}.jpg" alt="${esc(b.hotel)}" data-cap="${esc(b.hotel)}" loading="lazy">`:""}<b>${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">${esc(b.hotel)} ↗</a>`:esc(b.hotel)}</b><br>${esc(b.why)}</dd>${b.alt?`<dt>Alternatief</dt><dd>${esc(b.alt)}</dd>`:""}
+    <dl class="kv"><dt>Verblijf</dt><dd>${esc(b.nights)}</dd><dt>Prijs</dt><dd>${b.prijs!=null?eur(b.prijs):'<span class="note">nog onbekend</span>'}</dd><dt>Hotel</dt><dd>${b.hotelFoto?`<img class="hotelfoto zoom" src="img/${esc(b.hotelFoto)}.jpg" alt="${esc(b.hotel)}" data-cap="${esc(b.hotel)}" loading="lazy">`:""}<b>${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">${esc(b.hotel)} ↗</a>`:esc(b.hotel)}</b><br>${esc(b.why)}</dd>${b.alt?`<dt>Alternatief</dt><dd>${esc(b.alt)}</dd>`:""}
     <dt>Doen</dt><dd>${b.todo.map(esc).join(" · ")}</dd></dl>
     ${b.gal.length?`<div class="strip">${b.gal.map(([f,c])=>`<figure><img class="zoom" src="img/${f}.jpg" alt="${c}" data-cap="${c}" loading="lazy"><figcaption>${c}</figcaption></figure>`).join("")}</div>`:""}
     <div class="links"><a href="https://unsplash.com/s/photos/${b.q}" target="_blank" rel="noopener">Foto's op Unsplash ↗</a>
     ${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">Website hotel ↗</a>`:""}
     <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.g)}" target="_blank" rel="noopener">Hotel op Google Maps ↗</a></div>
    </div></article>`).join("");
+}
+const eur=n=>new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR"}).format(n);
+const nachtenVan=b=>parseInt(b.nights,10)||0;
+// Kosten van de accommodaties: wordt bij elke weergave opnieuw berekend uit de gegevens
+function drawKosten(){
+  const met=BASES.filter(b=>b.prijs!=null&&b.prijs!==""),zonder=BASES.filter(b=>b.prijs==null||b.prijs==="");
+  const tot=met.reduce((s,b)=>s+Number(b.prijs),0),nachten=BASES.reduce((s,b)=>s+nachtenVan(b),0);
+  const nMet=met.reduce((s,b)=>s+nachtenVan(b),0),pers=parseInt(infoVal("reizigers","4"),10)||4;
+  const rijen=BASES.map(b=>`<tr><td>${esc(b.name)} · ${esc(b.nights)}</td><td>${b.prijs!=null&&b.prijs!==""?eur(b.prijs):"nog onbekend"}</td></tr>`).join("");
+  const html=BASES.length?`<div class="note">Accommodaties totaal${zonder.length?" (tot nu toe)":""}</div><div class="tot">${eur(tot)}</div>
+   <div class="note">${nachten} nachten${nMet?` · gemiddeld ${eur(tot/nMet)} per nacht`:""} · ${eur(tot/pers)} per persoon (${pers} reizigers)</div>
+   ${zonder.length?`<p class="note" style="margin:6px 0 0">Nog zonder prijs: ${zonder.map(b=>esc(b.name)).join(", ")}</p>`:""}
+   <table class="tbl" style="margin-top:8px">${rijen}<tr class="som"><td>Totaal</td><td>${eur(tot)}</td></tr></table>`:"";
+  ["kosten-plekken","kosten-check"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=html});
 }
 function drawCheck(){
   document.getElementById("checklist").innerHTML=CHECK.map(c=>`<li><label for="c-${esc(c.id)}"><input type="checkbox" id="c-${esc(c.id)}" data-id="${esc(c.id)}" ${c.done?"checked":""}>
@@ -326,7 +347,7 @@ async function loadTrip(){
   const d=await r.json();
   BASES=d.bases;DAYS=d.days;LEGS=d.legs;CHECK=d.checklist;KAART=d.kaart||KAART;INFO=d.info||[];
 }
-function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawCheck();drawInfo();drawCount()}
+function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawCheck();drawKosten();drawInfo();drawCount()}
 const h=(location.hash||"").slice(1);
 let startTab="route";try{startTab=localStorage.getItem("thai27-tab")||"route"}catch(e){}
 if(["route","dagen","plekken","check","info","edit"].includes(h))startTab=h;
