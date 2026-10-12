@@ -14,7 +14,7 @@ const ENTITIES = {
   },
   overnachting: {
     table: "bases", key: "id", label: "Overnachting",
-    fields: { name: "text", dates: "text", nights: "text", hotel: "text", alternative: "textnull", why: "textnull", todo: "list", lat: "lat", lon: "lon", links: "bool" },
+    fields: { name: "text", dates: "text", nights: "text", hotel: "text", alternative: "textnull", why: "textnull", todo: "list", lat: "lat", lon: "lon", links: "bool", hotel_url: "url", hotel_foto: "photo" },
   },
   rit: {
     table: "legs", key: "sort", label: "Rit",
@@ -37,11 +37,13 @@ const FIELD_LABELS = {
 };
 // Het gebied dat de kaart toont (Zuid-Thailand)
 const BOUNDS = { latMin: 7.5, latMax: 14.2, lonMin: 97.5, lonMax: 101.2 };
-const PHOTOS = [
-  "01-wat-arun", "02-wat-arun-avond", "03-bangkok-fietsen", "04-maeklong", "05-sam-roi-yot-grot",
-  "06-prachuap", "07-kui-buri-olifant", "08-cheow-lan-meer", "09-raft-house", "10-railay",
-  "11-railay-kliffen", "12-phang-nga-mangrove", "13-samet-nangshe", "14-khao-lak-strand", "15-surin", "16-zonsondergang-golf", "17-chumphon-kust", "18-tempel-ban-krut", "19-khao-sok-jungle", "20-junglepad",
-];
+// Beschikbare foto's: alle .jpg-bestanden in public/img (nieuwe foto's tellen vanzelf mee)
+const IMG_DIR = require("path").join(__dirname, "public", "img");
+const listPhotos = () => {
+  try { return require("fs").readdirSync(IMG_DIR).filter((f) => f.endsWith(".jpg")).map((f) => f.slice(0, -4)).sort(); }
+  catch (_) { return []; }
+};
+const PHOTOS = listPhotos();
 
 class UserError extends Error {}
 const MAX_CHANGES = 40;
@@ -92,6 +94,14 @@ function cleanValue(type, v) {
         return out;
       });
     }
+    case "url": {
+      if (v === null || v === "") return null;
+      const t = text(v, 300);
+      let u;
+      try { u = new URL(t); } catch (_) { throw new UserError("Ongeldige link in het voorstel."); }
+      if (u.protocol !== "https:") throw new UserError("Links moeten met https:// beginnen.");
+      return u.toString();
+    }
     case "photo":
       if (v === null || v === "") return null;
       if (!PHOTOS.includes(v)) throw new UserError(`Onbekende foto: ${v}`);
@@ -134,7 +144,7 @@ async function snapshot() {
   const q = (sql) => db.query(sql).then((r) => r.rows);
   return {
     dagen: await q("select to_char(day_date,'YYYY-MM-DD') as sleutel, title, drive, items, photo from days order by day_date"),
-    overnachtingen: await q("select id as sleutel, name, dates, nights, hotel, alternative, why, todo, lat::float as lat, lon::float as lon, links from bases order by nr"),
+    overnachtingen: await q("select id as sleutel, name, dates, nights, hotel, alternative, why, todo, lat::float as lat, lon::float as lon, links, hotel_url, hotel_foto from bases order by nr"),
     ritten: await q("select sort::text as sleutel, date_label, route, duration from legs order by sort"),
     reserveringen: await q("select id as sleutel, title, note, done from checklist order by sort"),
     kaart: (await q("select id as sleutel, route, tussenstops, dagtrips from kaart"))[0] || null,
@@ -202,13 +212,14 @@ De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulp
 
 Regels:
 - Gebruik alleen de sleutels uit de huidige gegevens hieronder.
-- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done).
+- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done).
 - Toevoegen en verwijderen kan alleen bij reserveringen. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
 - De kaart: "route" is de rode lijn, in reisvolgorde, van vliegveld tot vliegveld, inclusief de overnachtingsplekken. "tussenstops" zijn plekken op de route waar je niet slaapt, "dagtrips" zijn uitstapjes vanaf een overnachting. Elk punt is {"naam","lat","lon"} met optioneel "links": true als het label links van de pin moet (bijvoorbeeld als het rechts tegen een ander label aan zou staan). Lijsten geef je altijd compleet terug.
 - Verandert de route (een andere overnachtingsplek, een extra stop of een omweg), pas dan in één voorstel alles aan wat erbij hoort: de lat/lon van de overnachting, de kaart (route en eventueel tussenstops of dagtrips), de ritten en het dagprogramma.
 - Coördinaten: gebruik de echte ligging van de plek in decimale graden. De kaart toont alleen Zuid-Thailand (breedtegraad ${BOUNDS.latMin}–${BOUNDS.latMax}, lengtegraad ${BOUNDS.lonMin}–${BOUNDS.lonMax}); een plek daarbuiten kan niet, leg dat dan uit.
 - Lijsten (items, todo) geef je altijd compleet terug, inclusief de punten die blijven staan.
-- Foto's: kies alleen uit ${PHOTOS.join(", ")}, of null.
+- Foto's (photo en hotel_foto): kies alleen uit ${PHOTOS.join(", ")}, of null.
+- hotel_url is de link naar de website of boekingspagina van het hotel (alleen https://). Verandert het hotel, zet hotel_url dan op null tenzij de gebruiker een link geeft; verzin geen links.
 - Houd de stijl van de bestaande teksten aan: kort, Nederlands, geen emoji.
 - Als iets in het verzoek niet kan of onduidelijk is, geef dan een lege lijst wijzigingen en leg in de samenvatting uit wat je nodig hebt.
 - Roep altijd het hulpmiddel "voorstel" aan, ook als er niets te wijzigen valt (dan met een lege lijst wijzigingen).

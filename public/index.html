@@ -77,6 +77,8 @@ svg{display:block;width:100%;height:auto}
 .kv{display:grid;grid-template-columns:76px minmax(0,1fr);gap:4px 10px;font-size:14px}
 .kv dt{color:var(--muted)}
 .kv dd{margin:0}
+.kv dd a{color:var(--sea)}
+.hotelfoto{display:block;width:100%;max-width:320px;aspect-ratio:3/2;object-fit:cover;border-radius:10px;margin:2px 0 8px;cursor:zoom-in}
 .links{display:flex;flex-wrap:wrap;gap:8px}
 .links a{font-size:13px;font-weight:700;color:var(--sea);text-decoration:none;border:1px solid var(--line);padding:6px 10px;border-radius:8px}
 .links a:hover{border-color:var(--sea)}
@@ -277,10 +279,11 @@ function drawPlaces(){
   document.getElementById("places").innerHTML=BASES.map(b=>`<article class="place" id="p-${b.id}">
    <div class="band${b.img&&b.img[0]?"":" nofoto"}">${b.img&&b.img[0]?`<img class="zoom" src="img/${esc(b.img[0])}.jpg" alt="${esc(b.img[1])}" data-cap="${esc(b.img[1])}" loading="lazy">`:""}<span class="num">${b.n}</span><span class="when">${b.dates}</span></div>
    <div class="in"><h3>${esc(b.name)}</h3>
-    <dl class="kv"><dt>Verblijf</dt><dd>${esc(b.nights)}</dd><dt>Hotel</dt><dd><b>${esc(b.hotel)}</b><br>${esc(b.why)}</dd><dt>Alternatief</dt><dd>${esc(b.alt)}</dd>
+    <dl class="kv"><dt>Verblijf</dt><dd>${esc(b.nights)}</dd><dt>Hotel</dt><dd>${b.hotelFoto?`<img class="hotelfoto zoom" src="img/${esc(b.hotelFoto)}.jpg" alt="${esc(b.hotel)}" data-cap="${esc(b.hotel)}" loading="lazy">`:""}<b>${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">${esc(b.hotel)} ↗</a>`:esc(b.hotel)}</b><br>${esc(b.why)}</dd>${b.alt?`<dt>Alternatief</dt><dd>${esc(b.alt)}</dd>`:""}
     <dt>Doen</dt><dd>${b.todo.map(esc).join(" · ")}</dd></dl>
     ${b.gal.length?`<div class="strip">${b.gal.map(([f,c])=>`<figure><img class="zoom" src="img/${f}.jpg" alt="${c}" data-cap="${c}" loading="lazy"><figcaption>${c}</figcaption></figure>`).join("")}</div>`:""}
     <div class="links"><a href="https://unsplash.com/s/photos/${b.q}" target="_blank" rel="noopener">Foto's op Unsplash ↗</a>
+    ${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">Website hotel ↗</a>`:""}
     <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.g)}" target="_blank" rel="noopener">Hotel op Google Maps ↗</a></div>
    </div></article>`).join("");
 }
