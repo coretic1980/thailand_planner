@@ -110,6 +110,11 @@ function cleanValue(type, v) {
         if (!p || typeof p !== "object") throw new UserError("Ongeldig kaartpunt.");
         const out = { naam: text(p.naam, 60), lat: cleanValue("lat", p.lat), lon: cleanValue("lon", p.lon) };
         if (p.links === true) out.links = true;
+        if (type === "points" && p.dag != null && p.dag !== "") {
+          if (!/^2027-02-(0[3-9]|1[0-7])$/.test(p.dag)) throw new UserError("De dag van een uitstapje moet tussen 2027-02-03 en 2027-02-17 liggen.");
+          out.dag = p.dag;
+        }
+        if (type === "points" && p.tekst != null && p.tekst !== "") out.tekst = text(p.tekst, 250);
         return out;
       });
     }
@@ -248,7 +253,8 @@ Regels:
 - Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done), info (label, waarde, tekst).
 - Toevoegen en verwijderen kan alleen bij reserveringen en info. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
 - Info is de rest van de app: de kop van de pagina en de teller (sectie "algemeen": hero_label, hero_titel, hero_tekst, hero_foto met het onderschrift in tekst, reis_start, reis_einde, reisdagen, afstand, en de fotocredits in "fotos"), de vluchten (sectie "vlucht": label, waarde = tijd, tekst = regels gescheiden door \\n), praktische info (sectie "praktisch": label en tekst), noodnummers (sectie "nood": label, waarde = nummer, tekst = opmerking) en Thaise woorden (sectie "woorden": label = Nederlands, tekst = Thais). Een nieuwe info-regel geeft je met actie "toevoegen", sleutel null en velden sectie (vlucht, praktisch, nood of woorden), label en tekst of waarde. Regels in de sectie "algemeen" kun je wijzigen, niet toevoegen of verwijderen.
-- De kaart: "route" is de rode lijn, in reisvolgorde, van vliegveld tot vliegveld, inclusief de overnachtingsplekken. "tussenstops" zijn plekken op de route waar je niet slaapt, "dagtrips" zijn uitstapjes vanaf een overnachting. Elk punt is {"naam","lat","lon"} met optioneel "links": true als het label links van de pin moet (bijvoorbeeld als het rechts tegen een ander label aan zou staan). Lijsten geef je altijd compleet terug.
+- De kaart: "route" is de rode lijn, in reisvolgorde, van vliegveld tot vliegveld, inclusief de overnachtingsplekken. "tussenstops" zijn plekken op de route waar je niet slaapt, "dagtrips" zijn uitstapjes vanaf een overnachting. Elk punt is {"naam","lat","lon"} met optioneel "links": true als het label links van de pin moet (bijvoorbeeld als het rechts tegen een ander label aan zou staan). Tussenstops en dagtrips kunnen ook "dag" (de datum, bijvoorbeeld "2027-02-05") en "tekst" (één of twee zinnen) hebben; dan staan ze als klikbaar uitstapje op de kaart. Lijsten geef je altijd compleet terug, met alle velden van de punten die blijven staan.
+- Uitstapjes: wordt een uitstapje buiten de overnachtingsplaats toegevoegd, verplaatst of geschrapt in het dagprogramma, pas dan ook het punt op de kaart aan (dagtrips of tussenstops, met dag en tekst). Activiteiten in de overnachtingsplaats zelf krijgen geen eigen punt.
 - Verandert de route (een andere overnachtingsplek, een extra stop of een omweg), pas dan in één voorstel alles aan wat erbij hoort: de lat/lon van de overnachting, de kaart (route en eventueel tussenstops of dagtrips), de ritten en het dagprogramma.
 - Coördinaten: gebruik de echte ligging van de plek in decimale graden. De kaart toont alleen Zuid-Thailand (breedtegraad ${BOUNDS.latMin}–${BOUNDS.latMax}, lengtegraad ${BOUNDS.lonMin}–${BOUNDS.lonMax}); een plek daarbuiten kan niet, leg dat dan uit.
 - Lijsten (items, todo) geef je altijd compleet terug, inclusief de punten die blijven staan.
