@@ -5,7 +5,7 @@
 const db = require("./index");
 
 (async () => {
-  await db.query("drop table if exists change_log, checklist, legs, days, kaart, bases cascade");
+  await db.query("drop table if exists migraties, change_log, checklist, legs, days, kaart, bases cascade");
   await db.init();
   console.log("Database opnieuw opgebouwd.");
   await db.pool.end();

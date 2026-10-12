@@ -10,6 +10,7 @@ Node/Express-app op Render, met de reisgegevens in Neon (Postgres).
 | `server.js` | Express-server: serveert de app en de API |
 | `assistant.js` | Aanpassen via prompts: Claude-voorstel, controle, toepassen, terugdraaien |
 | `db/schema.sql` | Tabellen: `bases`, `days`, `legs`, `checklist`, `kaart`, `change_log` |
+| `db/migraties/` | Latere wijzigingen in de reisgegevens; elk bestand wordt bij het opstarten één keer uitgevoerd |
 | `db/kaart-seed.sql` | Routelijn, tussenstops en dagtrips voor de kaart |
 | `db/seed.sql` | Alle reisgegevens (overnachtingen, dagprogramma, ritten, reserveringen) |
 | `db/index.js` | Databaseverbinding; maakt bij de eerste start de tabellen aan en vult ze |

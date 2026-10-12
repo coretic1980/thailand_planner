@@ -35,6 +35,34 @@ async function init() {
     await query(kaartSeed);
     console.log("Kaartgegevens toegevoegd.");
   }
+  await migrate();
+}
+
+// Wijzigingen in de reisgegevens staan als losse SQL-bestanden in db/migraties/.
+// Elk bestand wordt precies één keer uitgevoerd, in volgorde van de bestandsnaam.
+async function migrate() {
+  await query("create table if not exists migraties (naam text primary key, toegepast timestamptz not null default now())");
+  const dir = path.join(__dirname, "migraties");
+  if (!fs.existsSync(dir)) return;
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  const done = new Set((await query("select naam from migraties")).rows.map((r) => r.naam));
+  for (const f of files) {
+    if (done.has(f)) continue;
+    const sql = fs.readFileSync(path.join(dir, f), "utf8");
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query(sql);
+      await client.query("insert into migraties (naam) values ($1)", [f]);
+      await client.query("commit");
+      console.log("Wijziging toegepast:", f);
+    } catch (e) {
+      await client.query("rollback").catch(() => {});
+      throw new Error(`Wijziging ${f} mislukt: ${e.message}`);
+    } finally {
+      client.release();
+    }
+  }
 }
 
 module.exports = { query, init, pool };
