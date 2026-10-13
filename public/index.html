@@ -25,6 +25,8 @@
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
 .wrap{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
 header.hero{padding-block:28px 18px}
+.topbar{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:-14px 0 10px}
+.topbar a.ghost{padding:6px 12px;font-size:13px;text-decoration:none;display:inline-block}
 .eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--sea);font-weight:700}
 h1{font-family:var(--display);font-weight:800;font-size:clamp(30px,7vw,46px);line-height:1.02;margin:.25em 0 .2em;text-wrap:balance}
 h2{font-family:var(--display);font-weight:800;font-size:24px;margin:28px 0 10px;text-wrap:balance}
@@ -150,6 +152,7 @@ img{max-width:100%}
 
 <div class="wrap">
   <header class="hero">
+    <div class="topbar" id="topbar" hidden><span class="chip" id="rol-chip"></span><a class="ghost" href="logout">Uitloggen</a></div>
     <div class="eyebrow" id="hero-label">Gezinsreis</div>
     <h1 id="hero-titel">Thailand</h1>
     <p class="sub" id="hero-tekst"></p>
@@ -443,6 +446,8 @@ async function loadTrip(){
 // Rol ophalen: gasten kunnen alleen kijken
 const rolKlaar=fetch("api/me",{cache:"no-store"}).then(r=>r.json()).then(d=>{ROLE=d.rol==="gast"?"gast":"admin"}).catch(()=>{}).then(()=>{
   const ri=document.getElementById("rol-info");
+  const tb=document.getElementById("topbar"),rc=document.getElementById("rol-chip");
+  if(tb&&rc){rc.textContent=ROLE==="gast"?"Gast":"Beheerder";tb.hidden=false}
   if(ri)ri.textContent=ROLE==="gast"?"Je bent ingelogd als gast: je kunt alles bekijken, maar niets aanpassen. Log uit en log in met het beheerderswachtwoord om iets te wijzigen.":"Je bent ingelogd als beheerder.";
   if(ROLE==="gast"){
     const t=document.getElementById("t-edit");if(t)t.hidden=true;
