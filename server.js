@@ -1,7 +1,9 @@
 // Thailand reisapp: Express-server met Neon (Postgres) als database.
 // Omgevingsvariabelen:
 //   DATABASE_URL  - Neon connection string (verplicht)
-//   APP_PASSWORD  - optioneel; als gezet, toont de app eerst een inlogscherm
+//   APP_PASSWORD  - optioneel; als gezet, toont de app eerst een inlogscherm (gastwachtwoord)
+//   ADMIN_PASSWORD - optioneel; als gezet, kan alleen wie hiermee inlogt iets aanpassen.
+//                   Wie met APP_PASSWORD inlogt, kan dan alleen kijken.
 //   PORT          - wordt door Render gezet
 
 const express = require("express");
@@ -28,6 +30,7 @@ app.get("/healthz", async (_req, res) => {
 // Verander je APP_PASSWORD, dan moet iedereen opnieuw inloggen.
 app.set("trust proxy", 1); // Render zet een proxy voor de app
 const PASSWORD = process.env.APP_PASSWORD || "";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 const COOKIE = "reis_sessie";
 const MAX_AGE = 30 * 24 * 3600; // seconden
 function safeEqual(a, b) {
@@ -35,7 +38,9 @@ function safeEqual(a, b) {
   const hb = crypto.createHash("sha256").update(String(b)).digest();
   return crypto.timingSafeEqual(ha, hb);
 }
-const sessionToken = () => crypto.createHmac("sha256", PASSWORD).update("thailand-reisapp-sessie-v1").digest("hex");
+// Eén sessietoken per rol. Zonder ADMIN_PASSWORD is iedereen die inlogt beheerder (zoals vroeger).
+const sessionToken = (rol) => crypto.createHmac("sha256", PASSWORD + "|" + ADMIN_PASSWORD)
+  .update(rol === "admin" && ADMIN_PASSWORD ? "thailand-reisapp-sessie-v2-admin" : "thailand-reisapp-sessie-v2-gast").digest("hex");
 function readCookie(req, name) {
   for (const part of (req.headers.cookie || "").split(";")) {
     const i = part.indexOf("=");
@@ -43,7 +48,21 @@ function readCookie(req, name) {
   }
   return "";
 }
-const loggedIn = (req) => !PASSWORD || safeEqual(readCookie(req, COOKIE), sessionToken());
+// Welke rol heeft deze bezoeker? "admin", "gast" of null (niet ingelogd)
+function roleOf(req) {
+  if (!PASSWORD) return ADMIN_PASSWORD ? "gast" : "admin";
+  const c = readCookie(req, COOKIE);
+  if (!c) return null;
+  if (ADMIN_PASSWORD && safeEqual(c, sessionToken("admin"))) return "admin";
+  if (safeEqual(c, sessionToken("gast"))) return ADMIN_PASSWORD ? "gast" : "admin";
+  return null;
+}
+const loggedIn = (req) => roleOf(req) !== null;
+const isAdmin = (req) => roleOf(req) === "admin";
+function requireAdmin(req, res, next) {
+  if (isAdmin(req)) return next();
+  res.status(403).json({ error: "Je bent ingelogd als gast en kunt alleen kijken. Log in met het beheerderswachtwoord om iets aan te passen." });
+}
 function setCookie(req, res, value, maxAge) {
   const secure = req.secure ? "; Secure" : "";
   res.set("Set-Cookie", `${COOKIE}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure}`);
@@ -67,12 +86,13 @@ app.post("/login", (req, res) => {
     return res.status(429).json({ error: "Te veel pogingen. Probeer het over een kwartier opnieuw." });
   }
   const pw = typeof req.body?.password === "string" ? req.body.password : "";
-  if (!pw || !safeEqual(pw, PASSWORD)) {
-    return res.status(401).json({ error: "Dat wachtwoord klopt niet." });
-  }
+  let rol = null;
+  if (pw && ADMIN_PASSWORD && safeEqual(pw, ADMIN_PASSWORD)) rol = "admin";
+  else if (pw && safeEqual(pw, PASSWORD)) rol = ADMIN_PASSWORD ? "gast" : "admin";
+  if (!rol) return res.status(401).json({ error: "Dat wachtwoord klopt niet." });
   attempts.delete(req.ip);
-  setCookie(req, res, sessionToken(), MAX_AGE);
-  res.json({ ok: true });
+  setCookie(req, res, sessionToken(rol), MAX_AGE);
+  res.json({ ok: true, rol });
 });
 
 app.get("/logout", (req, res) => {
@@ -88,6 +108,9 @@ app.use((req, res, next) => {
   res.set("Cache-Control", "no-store");
   res.sendFile(path.join(__dirname, "public", "login.html"));
 });
+
+// Wie ben ik? (de app verbergt de knoppen om aan te passen voor gasten)
+app.get("/api/me", (req, res) => res.json({ rol: roleOf(req) }));
 
 // Alle reisgegevens in één keer
 app.get("/api/trip", async (_req, res, next) => {
@@ -128,7 +151,7 @@ app.get("/api/trip", async (_req, res, next) => {
 });
 
 // Een reservering afvinken of terugzetten
-app.patch("/api/checklist/:id", async (req, res, next) => {
+app.patch("/api/checklist/:id", requireAdmin, async (req, res, next) => {
   try {
     if (typeof req.body?.done !== "boolean") {
       return res.status(400).json({ error: "Stuur { done: true } of { done: false }." });
@@ -148,7 +171,7 @@ app.patch("/api/checklist/:id", async (req, res, next) => {
 const assistant = require("./assistant");
 
 // Prijs van een overnachting direct aanpassen (veld in de kostenlijst)
-app.patch("/api/bases/:id/prijs", handle((req) => assistant.setPrice(req.params.id, req.body?.prijs ?? null)));
+app.patch("/api/bases/:id/prijs", requireAdmin, handle((req) => assistant.setPrice(req.params.id, req.body?.prijs ?? null)));
 
 // Eenvoudige limiet: maximaal 30 voorstellen per uur (beschermt je API-tegoed)
 let windowStart = Date.now(), proposals = 0;
@@ -173,16 +196,20 @@ function handle(fn) {
   };
 }
 
-app.get("/api/assistant/status", (_req, res) => res.json(assistant.status()));
-app.get("/api/assistant/history", requireAssistant, handle(() => assistant.history()));
-app.post("/api/assistant/propose", requireAssistant, (req, res, next) => {
+app.get("/api/assistant/status", (req, res) => {
+  const s = assistant.status();
+  if (s.enabled && !isAdmin(req)) return res.json({ enabled: false, gast: true, reason: "je bent ingelogd als gast. Log in met het beheerderswachtwoord om iets aan te passen." });
+  res.json(s);
+});
+app.get("/api/assistant/history", requireAdmin, requireAssistant, handle(() => assistant.history()));
+app.post("/api/assistant/propose", requireAdmin, requireAssistant, (req, res, next) => {
   if (!underLimit()) return res.status(429).json({ error: "Je hebt het maximum van 30 voorstellen per uur bereikt." });
   next();
 }, handle((req) => assistant.propose(req.body?.prompt)));
-app.get("/api/assistant/open", requireAssistant, handle(() => assistant.openProposal()));
-app.post("/api/assistant/apply", requireAssistant, handle((req) => assistant.applyProposal(req.body?.id)));
-app.post("/api/assistant/cancel", requireAssistant, handle((req) => assistant.cancel(req.body?.id)));
-app.post("/api/assistant/undo", requireAssistant, handle(() => assistant.undoLast()));
+app.get("/api/assistant/open", requireAdmin, requireAssistant, handle(() => assistant.openProposal()));
+app.post("/api/assistant/apply", requireAdmin, requireAssistant, handle((req) => assistant.applyProposal(req.body?.id)));
+app.post("/api/assistant/cancel", requireAdmin, requireAssistant, handle((req) => assistant.cancel(req.body?.id)));
+app.post("/api/assistant/undo", requireAdmin, requireAssistant, handle(() => assistant.undoLast()));
 
 // Versie van de gegevens: de app vraagt dit elke 30 seconden op en ververst als het verandert
 app.get("/api/versie", handle(async () => ({ versie: await assistant.dataVersion() })));

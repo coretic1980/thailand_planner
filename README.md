@@ -49,6 +49,7 @@ Zet deze map in een nieuwe (private) GitHub-repository.
 2. Vul de omgevingsvariabelen in:
    - `DATABASE_URL`: de Neon connection string
    - `APP_PASSWORD`: een wachtwoord voor de app (aanbevolen, want er staan hotels en reisdata in). Laat je dit leeg, dan is de app openbaar en staat Aanpassen uit.
+   - `ADMIN_PASSWORD`: het beheerderswachtwoord. Wie hiermee inlogt, kan afvinken, prijzen invullen en Aanpassen gebruiken. Wie met `APP_PASSWORD` inlogt, is gast en kan alleen kijken. Zonder `ADMIN_PASSWORD` kan iedereen die inlogt alles aanpassen.
    - `ANTHROPIC_API_KEY`: nodig voor het tabblad Aanpassen.
 3. Deploy. In de logs zie je bij de eerste start: `Database gevuld met de reisgegevens.`
 
