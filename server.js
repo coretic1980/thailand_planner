@@ -211,8 +211,23 @@ app.post("/api/assistant/apply", requireAdmin, requireAssistant, handle((req) =>
 app.post("/api/assistant/cancel", requireAdmin, requireAssistant, handle((req) => assistant.cancel(req.body?.id)));
 app.post("/api/assistant/undo", requireAdmin, requireAssistant, handle(() => assistant.undoLast()));
 
-// Versie van de gegevens: de app vraagt dit elke 30 seconden op en ververst als het verandert
-app.get("/api/versie", handle(async () => ({ versie: await assistant.dataVersion() })));
+// Versie van de app zelf: een vingerafdruk van de bestanden in public/ (behalve foto's).
+// Verandert alleen als een deploy de app echt aanpast, niet als Render de server herstart.
+const APP_VERSIE = (() => {
+  const h = crypto.createHash("sha256");
+  const map = path.join(__dirname, "public");
+  for (const f of require("fs").readdirSync(map).filter((f) => /\.(html|js|css|json)$/.test(f)).sort()) {
+    h.update(f); h.update(require("fs").readFileSync(path.join(map, f)));
+  }
+  return h.digest("hex").slice(0, 12);
+})();
+
+// Versie van de gegevens en van de app: de app vraagt dit elke 30 seconden op.
+// Andere gegevens: opnieuw laden. Nieuwe app (na een deploy): de pagina ververst zichzelf.
+app.get("/api/versie", handle(async (req) => {
+  req.res.setHeader("Cache-Control", "no-store");
+  return { versie: await assistant.dataVersion(), app: APP_VERSIE };
+}));
 
 // Foto's mogen lang in de cache; de pagina en de service worker niet, zodat een nieuwe versie meteen zichtbaar is
 app.use(express.static(path.join(__dirname, "public"), {
