@@ -39,7 +39,7 @@ const ENTITIES = {
   },
   budget: {
     table: "budget", key: "id", label: "Budget",
-    fields: { label: "text", bedrag: "prijs", toelichting: "textlong" },
+    fields: { label: "text", bedrag: "prijs", toelichting: "textlong", geboekt: "bool" },
   },
   info: {
     table: "info", key: "id", label: "Info",
@@ -58,7 +58,7 @@ const FIELD_LABELS = {
   verhuurder: "verhuurder", auto: "auto", reservering: "reserveringsnummer", status: "status", ophalen: "ophalen",
   ophalen_plek: "ophaalplek", inleveren: "inleveren", inleveren_plek: "inleverplek", ter_plaatse: "ter plaatse (€)",
   ter_plaatse_tekst: "ter plaatse (uitleg)", borg: "borg", details: "kenmerken", url: "link", notitie: "notitie",
-  bedrag: "bedrag (€)", toelichting: "toelichting",
+  bedrag: "bedrag (€)", toelichting: "toelichting", geboekt: "geboekt",
 };
 // Het gebied dat de kaart toont (Zuid-Thailand)
 const BOUNDS = { latMin: 7.5, latMax: 14.2, lonMin: 97.5, lonMax: 101.2 };
@@ -214,7 +214,7 @@ async function snapshot() {
     reserveringen: await q("select id as sleutel, title, note, done, groep, to_char(deadline,'YYYY-MM-DD') as deadline, deadline_label from checklist order by sort"),
     kaart: (await q("select id as sleutel, route, tussenstops, dagtrips from kaart"))[0] || null,
     info: await q("select id as sleutel, sectie, label, waarde, tekst from info order by sectie, sort, id"),
-    budget: await q("select id as sleutel, label, bedrag::float as bedrag, toelichting from budget order by sort, id"),
+    budget: await q("select id as sleutel, label, bedrag::float as bedrag, toelichting, geboekt from budget order by sort, id"),
     huurautos: await q("select id as sleutel, verhuurder, auto, reservering, status, ophalen, ophalen_plek, inleveren, inleveren_plek, prijs::float as prijs, ter_plaatse::float as ter_plaatse, ter_plaatse_tekst, borg, details, url, notitie from autohuur order by sort, id"),
   };
 }
@@ -291,7 +291,7 @@ De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulp
 
 Regels:
 - Gebruik alleen de sleutels uit de huidige gegevens hieronder.
-- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done, groep, deadline, deadline_label), info (label, waarde, tekst), budget (label, bedrag, toelichting), auto (verhuurder, auto, reservering, status, ophalen, ophalen_plek, inleveren, inleveren_plek, prijs, ter_plaatse, ter_plaatse_tekst, borg, details, url, notitie).
+- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done, groep, deadline, deadline_label), info (label, waarde, tekst), budget (label, bedrag, toelichting, geboekt), auto (verhuurder, auto, reservering, status, ophalen, ophalen_plek, inleveren, inleveren_plek, prijs, ter_plaatse, ter_plaatse_tekst, borg, details, url, notitie).
 - Toevoegen en verwijderen kan alleen bij reserveringen, info, de huurauto en het budget. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
 - Info is de rest van de app: de kop van de pagina en de teller (sectie "algemeen": hero_label, hero_titel, hero_tekst, hero_foto met het onderschrift in tekst, reis_start, reis_einde, reisdagen, afstand, en de fotocredits in "fotos"), de vluchten (sectie "vlucht": label, waarde = tijd, tekst = regels gescheiden door \\n), praktische info (sectie "praktisch": label en tekst), noodnummers (sectie "nood": label, waarde = nummer, tekst = opmerking) en Thaise woorden (sectie "woorden": label = Nederlands, tekst = Thais). Een nieuwe info-regel geeft je met actie "toevoegen", sleutel null en velden sectie (vlucht, praktisch, nood of woorden), label en tekst of waarde. Regels in de sectie "algemeen" kun je wijzigen, niet toevoegen of verwijderen.
 - De kaart: "route" is de rode lijn, in reisvolgorde, van vliegveld tot vliegveld, inclusief de overnachtingsplekken. "tussenstops" zijn plekken op de route waar je niet slaapt, "dagtrips" zijn uitstapjes vanaf een overnachting. Elk punt is {"naam","lat","lon"} met optioneel "links": true als het label links van de pin moet (bijvoorbeeld als het rechts tegen een ander label aan zou staan). Tussenstops en dagtrips kunnen ook "dag" (de datum, bijvoorbeeld "2027-02-05"), "tekst" (één of twee zinnen) en "foto" (uit de lijst met foto's) hebben; dan staan ze als klikbaar uitstapje op de kaart. Lijsten geef je altijd compleet terug, met alle velden van de punten die blijven staan.
@@ -304,7 +304,7 @@ Regels:
 - prijs is het totaalbedrag in euro voor het hele verblijf op die plek (alle kamers en nachten samen), als getal, bijvoorbeeld 298.2. De app telt de prijzen zelf op tot het totaal; zet het totaal dus nergens in een tekst. Verandert het hotel of het aantal nachten en noemt de gebruiker geen nieuwe prijs, zet prijs dan op null. Noemt de gebruiker een prijs, zet die dan in prijs en ook in de beschrijving (why) en de reservering, zoals bij de andere hotels.
 - Reserveringen hebben een groep ("hotels", "vervoer", "activiteiten" of "vertrek") en optioneel een deadline (datum, bijvoorbeeld "2027-01-29") met deadline_label: wat er op die datum moet gebeuren, kort, bijvoorbeeld "Gratis annuleren tot 29 jan" of "Betalen op 24 dec". Geef een nieuwe reservering altijd een groep. Noemt de gebruiker een annulerings- of betaaldatum, zet die dan in deadline en deadline_label.
 - De huurauto (soort "auto", gegevens in "huurautos"): ophalen en inleveren zijn het moment als tekst (bijvoorbeeld "do 4 feb 2027, 08:30"), ophalen_plek en inleveren_plek waar. prijs is wat vooraf betaald wordt en ter_plaatse wat ter plaatse nog betaald moet worden, allebei in euro als getal; de app telt ze mee in de reiskosten. ter_plaatse_tekst legt dat bedrag uit (bijvoorbeeld in baht). details is een lijst met korte kenmerken. Een nieuwe huurauto geef je met actie "toevoegen", sleutel null en minstens verhuurder, auto, ophalen en inleveren. Verandert het ophaal- of inlevermoment of de plek, pas dan ook de reservering met groep "vervoer", het dagprogramma, de ritten en de info "huurauto" aan.
-- Het budget zijn geschatte kosten die niet geboekt zijn (eten en drinken, uitstapjes, benzine): label, bedrag in euro als getal voor het hele gezin en de hele reis, en een korte toelichting. De app telt ze apart op als "geschat". Komt er een uitstapje bij of valt er een weg, pas dan alleen het budget aan als de gebruiker daarom vraagt.
+- Het budget zijn de overige kosten voor het hele gezin en de hele reis: label, bedrag in euro als getal, een korte toelichting en geboekt. geboekt is true voor wat al vastligt (zoals de vluchten) en false voor schattingen (eten en drinken, uitstapjes, benzine); de app telt ze apart op als "geboekt" en "geschat". Hotels en de huurauto staan niet in het budget maar bij overnachting en auto. Komt er een uitstapje bij of valt er een weg, pas dan alleen het budget aan als de gebruiker daarom vraagt.
 - Houd de stijl van de bestaande teksten aan: kort, Nederlands, geen emoji.
 - Als iets in het verzoek niet kan of onduidelijk is, geef dan een lege lijst wijzigingen en leg in de samenvatting uit wat je nodig hebt.
 - Roep altijd het hulpmiddel "voorstel" aan, ook als er niets te wijzigen valt (dan met een lege lijst wijzigingen).

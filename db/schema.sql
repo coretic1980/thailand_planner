@@ -117,5 +117,6 @@ create table if not exists budget (
   sort        int  not null default 1,
   label       text not null,
   bedrag      numeric(10,2),
-  toelichting text
+  toelichting text,
+  geboekt     boolean not null default false
 );

@@ -152,7 +152,7 @@ app.get("/api/trip", async (_req, res, next) => {
         prijs: a.prijs == null ? null : Number(a.prijs), terPlaatse: a.ter_plaatse == null ? null : Number(a.ter_plaatse),
         terPlaatseTekst: a.ter_plaatse_tekst, borg: a.borg, details: a.details || [], url: a.url, notitie: a.notitie,
       })),
-      budget: budget.rows.map((b) => ({ id: b.id, label: b.label, bedrag: b.bedrag == null ? null : Number(b.bedrag), toelichting: b.toelichting })),
+      budget: budget.rows.map((b) => ({ id: b.id, label: b.label, bedrag: b.bedrag == null ? null : Number(b.bedrag), toelichting: b.toelichting, geboekt: !!b.geboekt })),
     });
   } catch (e) {
     next(e);

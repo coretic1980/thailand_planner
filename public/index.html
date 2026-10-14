@@ -605,13 +605,15 @@ function kostenSom(){
   const met=BASES.filter(b=>b.prijs!=null&&b.prijs!==""),zonder=BASES.filter(b=>b.prijs==null||b.prijs==="");
   const tot=met.reduce((s,b)=>s+Number(b.prijs),0);
   const autoTot=AUTOS.reduce((s,a)=>s+(Number(a.prijs)||0)+(Number(a.terPlaatse)||0),0);
-  const budTot=BUDGET.reduce((s,b)=>s+(Number(b.bedrag)||0),0);
-  const geboekt=tot+autoTot;
-  return {met,zonder,tot,autoTot,budTot,geboekt,alles:geboekt+budTot,nachten:BASES.reduce((s,b)=>s+nachtenVan(b),0),nMet:met.reduce((s,b)=>s+nachtenVan(b),0)};
+  const som=l=>l.reduce((s,b)=>s+(Number(b.bedrag)||0),0);
+  const vast=BUDGET.filter(b=>b.geboekt),schat=BUDGET.filter(b=>!b.geboekt);
+  const vastTot=som(vast),budTot=som(schat);
+  const geboekt=tot+autoTot+vastTot;
+  return {met,zonder,tot,autoTot,vast,schat,vastTot,budTot,geboekt,alles:geboekt+budTot,nachten:BASES.reduce((s,b)=>s+nachtenVan(b),0),nMet:met.reduce((s,b)=>s+nachtenVan(b),0)};
 }
 // Alle kosten: geboekt (hotels, huurauto) en geschat (budget). Wordt bij elke weergave opnieuw berekend.
 function drawKosten(){
-  const {zonder,tot,autoTot,budTot,geboekt,alles,nachten,nMet}=kostenSom(),pers=parseInt(infoVal("reizigers","4"),10)||4;
+  const {zonder,tot,autoTot,vast,schat,budTot,geboekt,alles,nachten,nMet}=kostenSom(),pers=parseInt(infoVal("reizigers","4"),10)||4;
   const dagen=Math.max(1,DAYS.length-1);
   const bedrag=n=>n==null||n===""?"":Number(n).toLocaleString("nl-NL",{minimumFractionDigits:2,maximumFractionDigits:2});
   // Eén regel met een bedrag; beheerders kunnen het bedrag hier direct aanpassen
@@ -619,10 +621,10 @@ function drawKosten(){
     return `<tr><td><label for="${esc(iid)}">${label}</label>${uitleg?`<br><small class="note">${esc(uitleg)}</small>`:""}</td><td>${ROLE==="gast"?(waarde!=null&&waarde!==""?eur(waarde):"nog onbekend"):`€ <input class="prijs" id="${esc(iid)}" data-soort="${soort}" data-id="${esc(id)}" data-veld="${veld}" inputmode="decimal" autocomplete="off" placeholder="onbekend" value="${bedrag(waarde)}" aria-label="${label} in euro">`}</td></tr>`};
   const kop=t=>`<tr class="kop"><td colspan="2">${t}</td></tr>`;
   const sub=(t,n,uitleg)=>`<tr class="som"><td>${t}${uitleg?`<br><small class="note" style="font-weight:400">${uitleg}</small>`:""}</td><td>${eur(n)}</td></tr>`;
-  let rijen=kop("Hotels")+BASES.map(b=>rij("hotel",b.id,"prijs",`${esc(b.name)} · ${esc(b.nights)}`,b.prijs)).join("")
+  let rijen=vast.map(b=>rij("budget",b.id,"bedrag",esc(b.label),b.bedrag,b.toelichting)).join("")+kop("Hotels")+BASES.map(b=>rij("hotel",b.id,"prijs",`${esc(b.name)} · ${esc(b.nights)}`,b.prijs)).join("")
     +sub("Hotels",tot,`${nachten} nachten${nMet?`, gemiddeld ${eur(tot/nMet)} per nacht`:""}`);
   if(AUTOS.length)rijen+=kop("Huurauto")+AUTOS.map(a=>rij("auto",a.id,"prijs",`${esc(a.verhuurder)} · vooraf`,a.prijs)+rij("auto",a.id,"ter_plaatse",`${esc(a.verhuurder)} · ter plaatse`,a.terPlaatse)).join("")+sub("Huurauto",autoTot);
-  if(BUDGET.length)rijen+=kop("Geschat (nog niet geboekt)")+BUDGET.map(b=>rij("budget",b.id,"bedrag",esc(b.label),b.bedrag,b.toelichting)).join("")
+  if(schat.length)rijen+=kop("Geschat (nog niet geboekt)")+schat.map(b=>rij("budget",b.id,"bedrag",esc(b.label),b.bedrag,b.toelichting)).join("")
     +sub("Geschat",budTot,`ca. ${eur(budTot/dagen)} per dag (${dagen} dagen)`);
   const el=document.getElementById("kosten-plekken");
   if(el){
@@ -630,7 +632,7 @@ function drawKosten(){
     if(!actief){
       const wasOpen=!!el.querySelector("details[open]");
       el.innerHTML=BASES.length?`<details ${wasOpen?"open":""}><summary><div><div class="note">Reiskosten totaal${zonder.length?" (tot nu toe)":""}</div><div class="tot">${eur(alles)}</div>
-       <div class="note">Geboekt ${eur(geboekt)} (hotels${AUTOS.length?" en auto":""})${BUDGET.length?` · geschat ${eur(budTot)} (eten, uitstapjes${BUDGET.some(b=>b.id==="benzine")?", benzine":""})`:""}<br>${eur(alles/pers)} per persoon (${pers} reizigers)</div></div><span class="open-txt">${ROLE==="gast"?"Per onderdeel":"Bedragen"}</span></summary>
+       <div class="note">Geboekt ${eur(geboekt)} (${[...vast.map(b=>b.label.toLowerCase()),"hotels",...(AUTOS.length?["auto"]:[])].join(", ").replace(/, ([^,]*)$/," en $1")})${schat.length?` · geschat ${eur(budTot)} (${schat.map(b=>b.label.split(" ")[0].toLowerCase()).join(", ")})`:""}<br>${eur(alles/pers)} per persoon (${pers} reizigers)</div></div><span class="open-txt">${ROLE==="gast"?"Per onderdeel":"Bedragen"}</span></summary>
        ${zonder.length?`<p class="note" style="margin:6px 0 0">Nog zonder prijs: ${zonder.map(b=>esc(b.name)).join(", ")}</p>`:""}
        <table class="tbl" style="margin-top:8px">${rijen}<tr class="som totaal"><td>Totaal</td><td>${eur(alles)}</td></tr></table>
        ${ROLE==="gast"?"":`<p class="note kosten-msg" aria-live="polite" style="margin:6px 0 0">Pas een bedrag aan en druk op Enter; het totaal rekent vanzelf opnieuw.</p>`}</details>`:"";
@@ -641,7 +643,7 @@ function drawKosten(){
     }
   }
   const sum=document.getElementById("kosten-sum");
-  if(sum)sum.innerHTML=`<div><div class="note">Reiskosten${zonder.length?" (tot nu toe)":""}</div><b>${eur(alles)}</b><div class="note">geboekt ${eur(geboekt)}${BUDGET.length?` · geschat ${eur(budTot)}`:""}</div></div><a href="#" data-goto="plekken" data-open-kosten="1">Bedragen →</a>`;
+  if(sum)sum.innerHTML=`<div><div class="note">Reiskosten${zonder.length?" (tot nu toe)":""}</div><b>${eur(alles)}</b><div class="note">geboekt ${eur(geboekt)}${schat.length?` · geschat ${eur(budTot)}`:""}</div></div><a href="#" data-goto="plekken" data-open-kosten="1">Bedragen →</a>`;
 }
 function leesBedrag(v){const t=String(v).replace(/[€\s]/g,"");if(!t)return null;const n=Number(t.includes(",")||/^\d{1,3}(\.\d{3})+$/.test(t)?t.replace(/\./g,"").replace(",","."):t);return Number.isFinite(n)&&n>=0&&n<=100000?Math.round(n*100)/100:NaN}
 async function bedragWijzigen(inp,msg){
