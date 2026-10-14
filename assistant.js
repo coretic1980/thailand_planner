@@ -28,6 +28,19 @@ const ENTITIES = {
     table: "checklist", key: "id", label: "Reservering",
     fields: { title: "text", note: "textnull", done: "bool", groep: "groep", deadline: "datum", deadline_label: "textnull" },
   },
+  auto: {
+    table: "autohuur", key: "id", label: "Huurauto",
+    fields: {
+      verhuurder: "text", auto: "text", reservering: "textnull", status: "textnull",
+      ophalen: "text", ophalen_plek: "textnull", inleveren: "text", inleveren_plek: "textnull",
+      prijs: "prijs", ter_plaatse: "prijs", ter_plaatse_tekst: "textnull", borg: "textnull",
+      details: "list", url: "url", notitie: "textlong",
+    },
+  },
+  budget: {
+    table: "budget", key: "id", label: "Budget",
+    fields: { label: "text", bedrag: "prijs", toelichting: "textlong" },
+  },
   info: {
     table: "info", key: "id", label: "Info",
     fields: { sectie: "sectie", label: "text", waarde: "textnull", tekst: "textlong" },
@@ -35,13 +48,17 @@ const ENTITIES = {
 };
 // Bij info kun je regels toevoegen en verwijderen, behalve in de sectie "algemeen"
 const INFO_SECTIES = ["vlucht", "praktisch", "nood", "woorden"];
-const ADD_REMOVE = ["reservering", "info"];
+const ADD_REMOVE = ["reservering", "info", "auto", "budget"];
 const FIELD_LABELS = {
   title: "titel", drive: "rijtijd", items: "programma", photo: "foto", name: "naam", dates: "data",
   nights: "nachten", hotel: "hotel", alternative: "alternatief", why: "beschrijving", todo: "activiteiten",
   date_label: "datum", route: "route", duration: "duur", note: "toelichting", done: "geregeld",
   lat: "breedtegraad", lon: "lengtegraad", links: "label links", tussenstops: "tussenstops", dagtrips: "dagtrips",
   hotel_url: "link hotel", hotel_foto: "foto hotel", prijs: "prijs (€)", groep: "groep", deadline: "uiterste datum", deadline_label: "wat er dan moet", sectie: "sectie", label: "onderwerp", waarde: "waarde", tekst: "tekst",
+  verhuurder: "verhuurder", auto: "auto", reservering: "reserveringsnummer", status: "status", ophalen: "ophalen",
+  ophalen_plek: "ophaalplek", inleveren: "inleveren", inleveren_plek: "inleverplek", ter_plaatse: "ter plaatse (€)",
+  ter_plaatse_tekst: "ter plaatse (uitleg)", borg: "borg", details: "kenmerken", url: "link", notitie: "notitie",
+  bedrag: "bedrag (€)", toelichting: "toelichting",
 };
 // Het gebied dat de kaart toont (Zuid-Thailand)
 const BOUNDS = { latMin: 7.5, latMax: 14.2, lonMin: 97.5, lonMax: 101.2 };
@@ -78,7 +95,8 @@ function cleanValue(type, v) {
     case "prijs": {
       if (v === null || v === "") return null;
       const t = typeof v === "string" ? v.replace(/[€\s]/g, "") : null;
-      const n = t === null ? v : Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+      // Nederlandse notatie: 1.133,98 of 1.600 (punt als duizendtal)
+      const n = t === null ? v : Number(t.includes(",") || /^\d{1,3}(\.\d{3})+$/.test(t) ? t.replace(/\./g, "").replace(",", ".") : t);
       if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > 100000) throw new UserError("Ongeldig bedrag. Gebruik bijvoorbeeld 298,20.");
       return Math.round(n * 100) / 100;
     }
@@ -150,7 +168,7 @@ function cleanChange(c) {
   const actie = c.actie;
   if (!["wijzigen", "toevoegen", "verwijderen"].includes(actie)) throw new UserError(`Onbekende actie: ${actie}`);
   if (actie !== "wijzigen" && !ADD_REMOVE.includes(c.soort)) {
-    throw new UserError("Toevoegen en verwijderen kan alleen bij reserveringen en info.");
+    throw new UserError("Toevoegen en verwijderen kan alleen bij reserveringen, info, de huurauto en het budget.");
   }
   const out = { actie, soort: c.soort, sleutel: c.sleutel == null ? null : String(c.sleutel), velden: {} };
   if (actie !== "toevoegen" && !out.sleutel) throw new UserError("Wijziging zonder sleutel.");
@@ -162,6 +180,10 @@ function cleanChange(c) {
     out.velden[k] = cleanValue(ent.fields[k], v);
   }
   if (actie === "toevoegen" && c.soort === "reservering" && !out.velden.title) throw new UserError("Een nieuwe reservering heeft een titel nodig.");
+  if (actie === "toevoegen" && c.soort === "auto" && !(out.velden.verhuurder && out.velden.auto && out.velden.ophalen && out.velden.inleveren)) {
+    throw new UserError("Een nieuwe huurauto heeft een verhuurder, auto, ophaalmoment en inlevermoment nodig.");
+  }
+  if (actie === "toevoegen" && c.soort === "budget" && !out.velden.label) throw new UserError("Een nieuwe budgetregel heeft een omschrijving nodig.");
   if (c.soort === "info") {
     if (actie === "toevoegen" && (!out.velden.sectie || !out.velden.label)) throw new UserError("Nieuwe info heeft een sectie en een onderwerp nodig.");
     if (actie === "wijzigen" && "sectie" in out.velden) throw new UserError("De sectie van bestaande info kan niet veranderen.");
@@ -192,6 +214,8 @@ async function snapshot() {
     reserveringen: await q("select id as sleutel, title, note, done, groep, to_char(deadline,'YYYY-MM-DD') as deadline, deadline_label from checklist order by sort"),
     kaart: (await q("select id as sleutel, route, tussenstops, dagtrips from kaart"))[0] || null,
     info: await q("select id as sleutel, sectie, label, waarde, tekst from info order by sectie, sort, id"),
+    budget: await q("select id as sleutel, label, bedrag::float as bedrag, toelichting from budget order by sort, id"),
+    huurautos: await q("select id as sleutel, verhuurder, auto, reservering, status, ophalen, ophalen_plek, inleveren, inleveren_plek, prijs::float as prijs, ter_plaatse::float as ter_plaatse, ter_plaatse_tekst, borg, details, url, notitie from autohuur order by sort, id"),
   };
 }
 
@@ -207,11 +231,19 @@ async function describe(change) {
     if (change.soort === "info") {
       return { titel: `Nieuwe info (${change.velden.sectie}): ${change.velden.label}`, regels: [change.velden.waarde, change.velden.tekst].filter(Boolean) };
     }
+    if (change.soort === "budget") {
+      return { titel: `Nieuw in het budget: ${change.velden.label}`, regels: change.velden.bedrag != null ? [`bedrag: € ${fmtEur(change.velden.bedrag)}`] : [] };
+    }
+    if (change.soort === "auto") {
+      return { titel: `Nieuwe huurauto: ${change.velden.verhuurder}, ${change.velden.auto}`, regels: [`ophalen: ${change.velden.ophalen}`, `inleveren: ${change.velden.inleveren}`] };
+    }
     return { titel: `Nieuwe reservering: ${change.velden.title}`, regels: change.velden.note ? [`toelichting: ${change.velden.note}`] : [] };
   }
   const row = await getRow(db, ent, change.sleutel);
   if (!row) throw new UserError(`${ent.label} "${change.sleutel}" bestaat niet.`);
-  const naam = change.soort === "kaart" ? "routelijn, tussenstops en dagtrips" : (row.title || row.name || row.label || row.route || change.sleutel);
+  const naam = change.soort === "kaart" ? "routelijn, tussenstops en dagtrips"
+    : change.soort === "auto" ? `${row.verhuurder}, ${row.auto}`
+    : (row.title || row.name || row.label || row.route || change.sleutel);
   const wie = change.soort === "dag" ? `${ent.label} ${change.sleutel} (${naam})` : `${ent.label}: ${naam}`;
   if (change.actie === "verwijderen") return { titel: `Verwijderen: ${wie}`, regels: [] };
   const regels = [];
@@ -259,8 +291,8 @@ De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulp
 
 Regels:
 - Gebruik alleen de sleutels uit de huidige gegevens hieronder.
-- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done, groep, deadline, deadline_label), info (label, waarde, tekst).
-- Toevoegen en verwijderen kan alleen bij reserveringen en info. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
+- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done, groep, deadline, deadline_label), info (label, waarde, tekst), budget (label, bedrag, toelichting), auto (verhuurder, auto, reservering, status, ophalen, ophalen_plek, inleveren, inleveren_plek, prijs, ter_plaatse, ter_plaatse_tekst, borg, details, url, notitie).
+- Toevoegen en verwijderen kan alleen bij reserveringen, info, de huurauto en het budget. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
 - Info is de rest van de app: de kop van de pagina en de teller (sectie "algemeen": hero_label, hero_titel, hero_tekst, hero_foto met het onderschrift in tekst, reis_start, reis_einde, reisdagen, afstand, en de fotocredits in "fotos"), de vluchten (sectie "vlucht": label, waarde = tijd, tekst = regels gescheiden door \\n), praktische info (sectie "praktisch": label en tekst), noodnummers (sectie "nood": label, waarde = nummer, tekst = opmerking) en Thaise woorden (sectie "woorden": label = Nederlands, tekst = Thais). Een nieuwe info-regel geeft je met actie "toevoegen", sleutel null en velden sectie (vlucht, praktisch, nood of woorden), label en tekst of waarde. Regels in de sectie "algemeen" kun je wijzigen, niet toevoegen of verwijderen.
 - De kaart: "route" is de rode lijn, in reisvolgorde, van vliegveld tot vliegveld, inclusief de overnachtingsplekken. "tussenstops" zijn plekken op de route waar je niet slaapt, "dagtrips" zijn uitstapjes vanaf een overnachting. Elk punt is {"naam","lat","lon"} met optioneel "links": true als het label links van de pin moet (bijvoorbeeld als het rechts tegen een ander label aan zou staan). Tussenstops en dagtrips kunnen ook "dag" (de datum, bijvoorbeeld "2027-02-05"), "tekst" (één of twee zinnen) en "foto" (uit de lijst met foto's) hebben; dan staan ze als klikbaar uitstapje op de kaart. Lijsten geef je altijd compleet terug, met alle velden van de punten die blijven staan.
 - Uitstapjes: wordt een uitstapje buiten de overnachtingsplaats toegevoegd, verplaatst of geschrapt in het dagprogramma, pas dan ook het punt op de kaart aan (dagtrips of tussenstops, met dag en tekst). Activiteiten in de overnachtingsplaats zelf krijgen geen eigen punt.
@@ -271,6 +303,8 @@ Regels:
 - hotel_url is de link naar de website of boekingspagina van het hotel (alleen https://). Verandert het hotel, zet hotel_url dan op null tenzij de gebruiker een link geeft; verzin geen links.
 - prijs is het totaalbedrag in euro voor het hele verblijf op die plek (alle kamers en nachten samen), als getal, bijvoorbeeld 298.2. De app telt de prijzen zelf op tot het totaal; zet het totaal dus nergens in een tekst. Verandert het hotel of het aantal nachten en noemt de gebruiker geen nieuwe prijs, zet prijs dan op null. Noemt de gebruiker een prijs, zet die dan in prijs en ook in de beschrijving (why) en de reservering, zoals bij de andere hotels.
 - Reserveringen hebben een groep ("hotels", "vervoer", "activiteiten" of "vertrek") en optioneel een deadline (datum, bijvoorbeeld "2027-01-29") met deadline_label: wat er op die datum moet gebeuren, kort, bijvoorbeeld "Gratis annuleren tot 29 jan" of "Betalen op 24 dec". Geef een nieuwe reservering altijd een groep. Noemt de gebruiker een annulerings- of betaaldatum, zet die dan in deadline en deadline_label.
+- De huurauto (soort "auto", gegevens in "huurautos"): ophalen en inleveren zijn het moment als tekst (bijvoorbeeld "do 4 feb 2027, 08:30"), ophalen_plek en inleveren_plek waar. prijs is wat vooraf betaald wordt en ter_plaatse wat ter plaatse nog betaald moet worden, allebei in euro als getal; de app telt ze mee in de reiskosten. ter_plaatse_tekst legt dat bedrag uit (bijvoorbeeld in baht). details is een lijst met korte kenmerken. Een nieuwe huurauto geef je met actie "toevoegen", sleutel null en minstens verhuurder, auto, ophalen en inleveren. Verandert het ophaal- of inlevermoment of de plek, pas dan ook de reservering met groep "vervoer", het dagprogramma, de ritten en de info "huurauto" aan.
+- Het budget zijn geschatte kosten die niet geboekt zijn (eten en drinken, uitstapjes, benzine): label, bedrag in euro als getal voor het hele gezin en de hele reis, en een korte toelichting. De app telt ze apart op als "geschat". Komt er een uitstapje bij of valt er een weg, pas dan alleen het budget aan als de gebruiker daarom vraagt.
 - Houd de stijl van de bestaande teksten aan: kort, Nederlands, geen emoji.
 - Als iets in het verzoek niet kan of onduidelijk is, geef dan een lege lijst wijzigingen en leg in de samenvatting uit wat je nodig hebt.
 - Roep altijd het hulpmiddel "voorstel" aan, ook als er niets te wijzigen valt (dan met een lege lijst wijzigingen).
@@ -413,6 +447,17 @@ async function applyChanges(client, prompt, summary, changes) {
         log.push({ table: ent.table, key: ent.key, keyValue: id, before: null });
         continue;
       }
+      if (c.actie === "toevoegen" && (c.soort === "auto" || c.soort === "budget")) {
+        const id = (c.soort === "auto" ? "a" : "b") + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const { rows } = await client.query(`select coalesce(max(sort),0)+1 as s from ${ent.table}`);
+        const cols = Object.keys(c.velden);
+        await client.query(
+          `insert into ${ent.table} (id, sort, ${cols.join(", ")}) values ($1, $2, ${cols.map((_, i) => "$" + (i + 3)).join(", ")})`,
+          [id, rows[0].s, ...cols.map((k) => c.velden[k])]
+        );
+        log.push({ table: ent.table, key: ent.key, keyValue: id, before: null });
+        continue;
+      }
       if (c.actie === "toevoegen") {
         const id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const { rows } = await client.query("select coalesce(max(sort),0)+1 as s from checklist");
@@ -497,6 +542,65 @@ async function setPrice(id, waarde) {
   }
 }
 
+// Prijs van een huurauto direct aanpassen: veld "prijs" (vooraf) of "ter_plaatse"
+async function setAutoPrice(id, veld, waarde) {
+  if (!["prijs", "ter_plaatse"].includes(veld)) throw new UserError("Onbekend bedrag.");
+  const bedrag = cleanValue("prijs", waarde);
+  const auto = await getRow(db, ENTITIES.auto, String(id));
+  if (!auto) throw new UserError("Deze huurauto bestaat niet.");
+  const oud = auto[veld] == null ? null : Number(auto[veld]);
+  if (oud === bedrag) return { id, [veld]: bedrag };
+  const changes = [];
+  const velden = { [veld]: bedrag };
+  const notitie = replacePrice(auto.notitie, oud, bedrag);
+  if (notitie && notitie.length <= 1000) velden.notitie = notitie;
+  changes.push({ actie: "wijzigen", soort: "auto", sleutel: auto.id, velden });
+  if (oud != null && bedrag != null) {
+    const { rows } = await db.query("select id, note from checklist where note like '%€%'");
+    for (const r of rows) {
+      const note = replacePrice(r.note, oud, bedrag);
+      if (note && note.length <= 300) changes.push({ actie: "wijzigen", soort: "reservering", sleutel: r.id, velden: { note } });
+    }
+  }
+  const wat = veld === "prijs" ? "vooraf" : "ter plaatse";
+  const label = `Huurauto ${auto.verhuurder} (${wat}): ${bedrag == null ? "onbekend" : "€ " + fmtEur(bedrag)}`;
+  const client = await db.pool.connect();
+  try {
+    await client.query("begin");
+    const logId = await applyChanges(client, label, `${label} (was ${oud == null ? "onbekend" : "€ " + fmtEur(oud)}).`, changes);
+    await client.query("commit");
+    return { id: auto.id, [veld]: bedrag, changeLogId: logId };
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+// Een budgetbedrag direct aanpassen
+async function setBudget(id, waarde) {
+  const bedrag = cleanValue("prijs", waarde);
+  const row = await getRow(db, ENTITIES.budget, String(id));
+  if (!row) throw new UserError("Deze budgetregel bestaat niet.");
+  const oud = row.bedrag == null ? null : Number(row.bedrag);
+  if (oud === bedrag) return { id, bedrag };
+  const label = `Budget ${row.label}: ${bedrag == null ? "onbekend" : "€ " + fmtEur(bedrag)}`;
+  const client = await db.pool.connect();
+  try {
+    await client.query("begin");
+    const logId = await applyChanges(client, label, `${label} (was ${oud == null ? "onbekend" : "€ " + fmtEur(oud)}).`,
+      [{ actie: "wijzigen", soort: "budget", sleutel: row.id, velden: { bedrag } }]);
+    await client.query("commit");
+    return { id: row.id, bedrag, changeLogId: logId };
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 async function undoLast() {
   const client = await db.pool.connect();
   try {
@@ -548,4 +652,4 @@ async function dataVersion() {
   return r.rows[0].v;
 }
 
-module.exports = { status, propose, openProposal, cancel, applyProposal, undoLast, history, dataVersion, setPrice, replacePrice, UserError };
+module.exports = { status, propose, openProposal, cancel, applyProposal, undoLast, history, dataVersion, setPrice, setAutoPrice, setBudget, replacePrice, UserError };

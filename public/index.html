@@ -166,6 +166,27 @@ details.day[open] summary::after{transform:rotate(-135deg);margin-top:4px}
 .kosten .open-txt::after{content:"";width:8px;height:8px;border-right:2px solid var(--sea);border-bottom:2px solid var(--sea);transform:rotate(45deg);margin-top:-4px;transition:transform .2s}
 .kosten details[open] .open-txt::after{transform:rotate(-135deg);margin-top:4px}
 .tbl{width:100%;border-collapse:collapse;font-size:14px}
+.autos{display:grid;gap:12px}
+.auto{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;scroll-margin-top:80px}
+.auto .kop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.auto h3{margin:2px 0 2px;font-size:17px}
+.auto .chip.warn{background:var(--sun-soft);color:var(--sun)}
+.auto .twee{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+.auto .twee b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.auto .twee span{display:block;font-size:14px}
+.auto .kenm{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.auto .kenm .chip{margin:0;font-weight:600}
+.auto .tbl{margin-top:4px}
+.auto .tbl td:last-child{text-align:right}
+.check .meer{display:inline-block;font-size:13px;font-weight:600;margin:4px 0 2px;padding:6px 0}
+.auto .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+@media (max-width:380px){.auto .twee{grid-template-columns:1fr}}
+.kosten .tbl tr.sub td{color:var(--muted);font-size:13px;padding-top:2px}
+.kosten .tbl tr.kop td{font-weight:700;color:var(--fg);padding-top:18px;text-align:left;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.kosten .tbl tr.som td{border-bottom:1px solid var(--line)}
+.kosten .tbl tr.totaal td{font-size:16px;border-bottom:0;border-top:2px solid var(--fg)}
+.kosten .tbl small.note{display:block;font-size:12px;line-height:1.4;margin-top:2px;max-width:46ch}
+.kosten .tbl td:first-child label{color:var(--fg)}
 .tbl td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}
 .tbl td:first-child{color:var(--muted);width:42%;padding-right:10px}
 .kosten .tbl td:first-child{width:auto}
@@ -281,7 +302,7 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
   <nav class="tabs" role="tablist" aria-label="Onderdelen">
     <button role="tab" id="t-route" aria-selected="true" data-tab="route">Route</button>
     <button role="tab" id="t-dagen" aria-selected="false" data-tab="dagen">Dag per dag</button>
-    <button role="tab" id="t-plekken" aria-selected="false" data-tab="plekken">Overnachtingen</button>
+    <button role="tab" id="t-plekken" aria-selected="false" data-tab="plekken">Hotels &amp; auto</button>
     <button role="tab" id="t-check" aria-selected="false" data-tab="check">Regelen</button>
     <button role="tab" id="t-info" aria-selected="false" data-tab="info">Info</button>
     <button role="tab" id="t-edit" aria-selected="false" data-tab="edit">Aanpassen</button>
@@ -323,9 +344,11 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
   </section>
 
   <section id="plekken" role="tabpanel" hidden>
-    <h2>Overnachtingen</h2>
+    <h2>Hotels &amp; auto</h2>
     <div class="kosten" id="kosten-plekken"></div>
     <div class="places" id="places"></div>
+    <h2 style="margin-top:24px">Huurauto</h2>
+    <div class="autos" id="autos"></div>
   </section>
 
   <section id="check" role="tabpanel" hidden>
@@ -392,7 +415,7 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
 
 <div class="toast-nieuw" id="nieuwe-versie" role="status" aria-live="polite" hidden><div><b>Nieuwe versie van de app</b><div id="nieuwe-versie-tekst">De app ververst over 5 seconden.</div></div><button type="button" class="primary" id="nieuwe-versie-knop">Nu verversen</button></div>
 <script>
-let BASES=[],DAYS=[],LEGS=[],CHECK=[],INFO=[],KAART={route:[],tussenstops:[],dagtrips:[]};
+let BASES=[],DAYS=[],LEGS=[],CHECK=[],INFO=[],AUTOS=[],BUDGET=[],KAART={route:[],tussenstops:[],dagtrips:[]};
 let ROLE="admin"; // "gast" kan alleen kijken
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const WD=["zo","ma","di","wo","do","vr","za"];
@@ -580,42 +603,83 @@ const eur=n=>new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR"}).fo
 const nachtenVan=b=>parseInt(b.nights,10)||0;
 function kostenSom(){
   const met=BASES.filter(b=>b.prijs!=null&&b.prijs!==""),zonder=BASES.filter(b=>b.prijs==null||b.prijs==="");
-  return {met,zonder,tot:met.reduce((s,b)=>s+Number(b.prijs),0),nachten:BASES.reduce((s,b)=>s+nachtenVan(b),0),nMet:met.reduce((s,b)=>s+nachtenVan(b),0)};
+  const tot=met.reduce((s,b)=>s+Number(b.prijs),0);
+  const autoTot=AUTOS.reduce((s,a)=>s+(Number(a.prijs)||0)+(Number(a.terPlaatse)||0),0);
+  const budTot=BUDGET.reduce((s,b)=>s+(Number(b.bedrag)||0),0);
+  const geboekt=tot+autoTot;
+  return {met,zonder,tot,autoTot,budTot,geboekt,alles:geboekt+budTot,nachten:BASES.reduce((s,b)=>s+nachtenVan(b),0),nMet:met.reduce((s,b)=>s+nachtenVan(b),0)};
 }
-// Kosten van de accommodaties: wordt bij elke weergave opnieuw berekend uit de gegevens
+// Alle kosten: geboekt (hotels, huurauto) en geschat (budget). Wordt bij elke weergave opnieuw berekend.
 function drawKosten(){
-  const {zonder,tot,nachten,nMet}=kostenSom(),pers=parseInt(infoVal("reizigers","4"),10)||4;
+  const {zonder,tot,autoTot,budTot,geboekt,alles,nachten,nMet}=kostenSom(),pers=parseInt(infoVal("reizigers","4"),10)||4;
+  const dagen=Math.max(1,DAYS.length-1);
   const bedrag=n=>n==null||n===""?"":Number(n).toLocaleString("nl-NL",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const rijen=BASES.map(b=>`<tr><td><label for="pr-${esc(b.id)}">${esc(b.name)} · ${esc(b.nights)}</label></td><td>${ROLE==="gast"?(b.prijs!=null&&b.prijs!==""?eur(b.prijs):"nog onbekend"):`€ <input class="prijs" id="pr-${esc(b.id)}" data-id="${esc(b.id)}" inputmode="decimal" autocomplete="off" placeholder="onbekend" value="${bedrag(b.prijs)}" aria-label="Prijs ${esc(b.name)} in euro">`}</td></tr>`).join("");
+  // Eén regel met een bedrag; beheerders kunnen het bedrag hier direct aanpassen
+  const rij=(soort,id,veld,label,waarde,uitleg)=>{const iid=`k-${soort}-${id}-${veld}`;
+    return `<tr><td><label for="${esc(iid)}">${label}</label>${uitleg?`<br><small class="note">${esc(uitleg)}</small>`:""}</td><td>${ROLE==="gast"?(waarde!=null&&waarde!==""?eur(waarde):"nog onbekend"):`€ <input class="prijs" id="${esc(iid)}" data-soort="${soort}" data-id="${esc(id)}" data-veld="${veld}" inputmode="decimal" autocomplete="off" placeholder="onbekend" value="${bedrag(waarde)}" aria-label="${label} in euro">`}</td></tr>`};
+  const kop=t=>`<tr class="kop"><td colspan="2">${t}</td></tr>`;
+  const sub=(t,n,uitleg)=>`<tr class="som"><td>${t}${uitleg?`<br><small class="note" style="font-weight:400">${uitleg}</small>`:""}</td><td>${eur(n)}</td></tr>`;
+  let rijen=kop("Hotels")+BASES.map(b=>rij("hotel",b.id,"prijs",`${esc(b.name)} · ${esc(b.nights)}`,b.prijs)).join("")
+    +sub("Hotels",tot,`${nachten} nachten${nMet?`, gemiddeld ${eur(tot/nMet)} per nacht`:""}`);
+  if(AUTOS.length)rijen+=kop("Huurauto")+AUTOS.map(a=>rij("auto",a.id,"prijs",`${esc(a.verhuurder)} · vooraf`,a.prijs)+rij("auto",a.id,"ter_plaatse",`${esc(a.verhuurder)} · ter plaatse`,a.terPlaatse)).join("")+sub("Huurauto",autoTot);
+  if(BUDGET.length)rijen+=kop("Geschat (nog niet geboekt)")+BUDGET.map(b=>rij("budget",b.id,"bedrag",esc(b.label),b.bedrag,b.toelichting)).join("")
+    +sub("Geschat",budTot,`ca. ${eur(budTot/dagen)} per dag (${dagen} dagen)`);
   const el=document.getElementById("kosten-plekken");
   if(el){
     const actief=document.activeElement&&el.contains(document.activeElement)&&document.activeElement.classList.contains("prijs");
     if(!actief){
       const wasOpen=!!el.querySelector("details[open]");
-      el.innerHTML=BASES.length?`<details ${wasOpen?"open":""}><summary><div><div class="note">Accommodaties totaal${zonder.length?" (tot nu toe)":""}</div><div class="tot">${eur(tot)}</div>
-       <div class="note">${nachten} nachten${nMet?` · gemiddeld ${eur(tot/nMet)} per nacht`:""} · ${eur(tot/pers)} per persoon (${pers} reizigers)</div></div><span class="open-txt">${ROLE==="gast"?"Per hotel":"Bedragen"}</span></summary>
+      el.innerHTML=BASES.length?`<details ${wasOpen?"open":""}><summary><div><div class="note">Reiskosten totaal${zonder.length?" (tot nu toe)":""}</div><div class="tot">${eur(alles)}</div>
+       <div class="note">Geboekt ${eur(geboekt)} (hotels${AUTOS.length?" en auto":""})${BUDGET.length?` · geschat ${eur(budTot)} (eten, uitstapjes${BUDGET.some(b=>b.id==="benzine")?", benzine":""})`:""}<br>${eur(alles/pers)} per persoon (${pers} reizigers)</div></div><span class="open-txt">${ROLE==="gast"?"Per onderdeel":"Bedragen"}</span></summary>
        ${zonder.length?`<p class="note" style="margin:6px 0 0">Nog zonder prijs: ${zonder.map(b=>esc(b.name)).join(", ")}</p>`:""}
-       <table class="tbl" style="margin-top:8px">${rijen}<tr class="som"><td>Totaal</td><td>${eur(tot)}</td></tr></table>
+       <table class="tbl" style="margin-top:8px">${rijen}<tr class="som totaal"><td>Totaal</td><td>${eur(alles)}</td></tr></table>
        ${ROLE==="gast"?"":`<p class="note kosten-msg" aria-live="polite" style="margin:6px 0 0">Pas een bedrag aan en druk op Enter; het totaal rekent vanzelf opnieuw.</p>`}</details>`:"";
       el.querySelectorAll("input.prijs").forEach(inp=>{
         inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();inp.blur()}});
-        inp.addEventListener("change",()=>prijsWijzigen(inp,el.querySelector(".kosten-msg")));
+        inp.addEventListener("change",()=>bedragWijzigen(inp,el.querySelector(".kosten-msg")));
       });
     }
   }
   const sum=document.getElementById("kosten-sum");
-  if(sum)sum.innerHTML=`<div><div class="note">Accommodaties${zonder.length?" (tot nu toe)":""}</div><b>${eur(tot)}</b></div><a href="#" data-goto="plekken" data-open-kosten="1">Per hotel →</a>`;
+  if(sum)sum.innerHTML=`<div><div class="note">Reiskosten${zonder.length?" (tot nu toe)":""}</div><b>${eur(alles)}</b><div class="note">geboekt ${eur(geboekt)}${BUDGET.length?` · geschat ${eur(budTot)}`:""}</div></div><a href="#" data-goto="plekken" data-open-kosten="1">Bedragen →</a>`;
 }
-function leesBedrag(v){const t=String(v).replace(/[€\s]/g,"");if(!t)return null;const n=Number(t.includes(",")?t.replace(/\./g,"").replace(",","."):t);return Number.isFinite(n)&&n>=0&&n<=100000?Math.round(n*100)/100:NaN}
-async function prijsWijzigen(inp,msg){
-  const b=BASES.find(x=>x.id===inp.dataset.id);if(!b)return;
+function leesBedrag(v){const t=String(v).replace(/[€\s]/g,"");if(!t)return null;const n=Number(t.includes(",")||/^\d{1,3}(\.\d{3})+$/.test(t)?t.replace(/\./g,"").replace(",","."):t);return Number.isFinite(n)&&n>=0&&n<=100000?Math.round(n*100)/100:NaN}
+async function bedragWijzigen(inp,msg){
+  const soort=inp.dataset.soort,id=inp.dataset.id,veld=inp.dataset.veld;
+  const item=soort==="hotel"?BASES.find(x=>x.id===id):soort==="auto"?AUTOS.find(x=>x.id===id):BUDGET.find(x=>x.id===id);if(!item)return;
+  const huidig=soort==="auto"?item[veld==="prijs"?"prijs":"terPlaatse"]:soort==="hotel"?item.prijs:item.bedrag;
   const n=leesBedrag(inp.value);
   const zeg=(t,err)=>{if(msg){msg.textContent=t;msg.style.color=err?"var(--sun)":"var(--muted)"}};
   if(Number.isNaN(n)){zeg("Dat is geen geldig bedrag. Gebruik bijvoorbeeld 298,20.",true);return}
-  if((b.prijs??null)===n){drawKosten();return}
+  if((huidig??null)===n){drawKosten();return}
   zeg("Opslaan…");
-  try{await savePrice(b,n);zeg("Opgeslagen. Ook de beschrijving en de reservering zijn bijgewerkt.")}
-  catch(e){zeg(e&&e.message?e.message:"Opslaan mislukt. Probeer het opnieuw.",true)}
+  try{
+    if(soort==="hotel"){await savePrice(item,n);zeg("Opgeslagen. Ook de beschrijving en de reservering zijn bijgewerkt.")}
+    else if(soort==="auto"){await saveAutoPrice(item,veld,n);zeg("Opgeslagen.")}
+    else{await saveBudget(item,n);zeg("Opgeslagen.")}
+  }catch(e){zeg(e&&e.message?e.message:"Opslaan mislukt. Probeer het opnieuw.",true)}
+}
+
+// ---------- Huurauto ----------
+function drawAutos(){
+  const el=document.getElementById("autos");if(!el)return;
+  if(!AUTOS.length){el.innerHTML=`<p class="note">Nog geen huurauto ingevoerd.${ROLE==="gast"?"":" Voeg hem toe via Aanpassen, bijvoorbeeld door de gegevens van de bevestiging te plakken."}</p>`;return}
+  el.innerHTML=AUTOS.map(a=>{
+    const bev=a.status&&/bevestigd/i.test(a.status)&&!/niet|aanvraag/i.test(a.status);
+    const geld=[a.prijs!=null?`<tr><td>Vooraf betaald</td><td>${eur(a.prijs)}</td></tr>`:"",
+      a.terPlaatse!=null?`<tr><td>Ter plaatse${a.terPlaatseTekst?`<br><small class="note">${esc(a.terPlaatseTekst)}</small>`:""}</td><td>ca. ${eur(a.terPlaatse)}</td></tr>`:"",
+      (a.prijs!=null||a.terPlaatse!=null)?`<tr class="som"><td>Totaal</td><td>${eur((Number(a.prijs)||0)+(Number(a.terPlaatse)||0))}</td></tr>`:"",
+      a.borg?`<tr><td>Borg</td><td style="white-space:normal">${esc(a.borg)}</td></tr>`:""].join("");
+    return `<article class="auto" id="auto-${esc(a.id)}">
+      <div class="kop"><div><div class="note">${esc(a.verhuurder)}${a.reservering?` · reservering ${esc(a.reservering)}`:""}</div><h3>${esc(a.auto)}</h3></div>
+        ${a.status?`<span class="chip${bev?"":" warn"}">${esc(a.status)}</span>`:""}</div>
+      <div class="twee"><div><b>Ophalen</b><span>${esc(a.ophalen)}</span>${a.ophalenPlek?`<span class="note">${esc(a.ophalenPlek)}</span>`:""}</div>
+        <div><b>Inleveren</b><span>${esc(a.inleveren)}</span>${a.inleverenPlek?`<span class="note">${esc(a.inleverenPlek)}</span>`:""}</div></div>
+      ${(a.details||[]).length?`<div class="kenm">${a.details.map(d=>`<span class="chip">${esc(d)}</span>`).join("")}</div>`:""}
+      ${geld?`<table class="tbl kosten-auto">${geld}</table>`:""}
+      ${a.notitie?`<p class="note" style="margin:10px 0 0">${esc(a.notitie)}</p>`:""}
+      <div class="links">${a.url?`<a href="${esc(a.url)}" target="_blank" rel="noopener">Boeking ↗</a>`:""}${a.inleverenPlek?`<a href="${routeLink(a.inleverenPlek)}" target="_blank" rel="noopener">Route naar inleverplek ↗</a>`:""}</div>
+    </article>`}).join("");
 }
 
 // ---------- Regelen ----------
@@ -633,7 +697,7 @@ function drawCheck(){
   const sorteer=(a,b)=>(a.done-b.done)||((a.deadline||"9")<(b.deadline||"9")?-1:(a.deadline||"9")>(b.deadline||"9")?1:(a.sort||0)-(b.sort||0));
   el.innerHTML=GROEPEN.map(([g,naam])=>{const items=CHECK.filter(c=>groep(c)===g).sort(sorteer);if(!items.length)return"";const klaar=items.filter(c=>c.done).length;
     return `<div class="groep"><h3>${naam}<span>${klaar} van ${items.length}</span></h3><ul class="check">${items.map(c=>`<li><label for="c-${esc(c.id)}"><input type="checkbox" id="c-${esc(c.id)}" data-id="${esc(c.id)}" ${c.done?"checked":""} ${ROLE==="gast"?"disabled":""}>
-     <span class="tekst ${c.done?"done":""}"><span class="titel">${esc(c.title)}</span>${c.note?`<small>${esc(c.note)}</small>`:""}${deadlineChip(c)}</span></label></li>`).join("")}</ul></div>`}).join("");
+     <span class="tekst ${c.done?"done":""}"><span class="titel">${esc(c.title)}</span>${c.note?`<small>${esc(c.note)}</small>`:""}${/huurauto/i.test(c.title)&&AUTOS.length?`<a class="meer" href="#" data-goto="plekken" data-scroll="auto-${esc(AUTOS[0].id)}">Details van de auto →</a>`:""}${deadlineChip(c)}</span></label></li>`).join("")}</ul></div>`}).join("");
   const n=CHECK.filter(c=>c.done).length;
   document.getElementById("bar").style.width=(CHECK.length?n/CHECK.length*100:0)+"%";
   document.getElementById("progtxt").textContent=`${n} van ${CHECK.length} geregeld`;
@@ -650,6 +714,20 @@ async function toggle(id,done){
 }
 async function savePrice(b,prijs){
   const r=await fetch("api/bases/"+encodeURIComponent(b.id)+"/prijs",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({prijs})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||"Opslaan mislukt. Probeer het opnieuw.");
+  await loadTrip();renderAll();
+  if(aiEnabled)loadHistory();
+}
+async function saveAutoPrice(a,veld,prijs){
+  const r=await fetch("api/autohuur/"+encodeURIComponent(a.id)+"/prijs",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({veld,prijs})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||"Opslaan mislukt. Probeer het opnieuw.");
+  await loadTrip();renderAll();
+  if(aiEnabled)loadHistory();
+}
+async function saveBudget(b,bedrag){
+  const r=await fetch("api/budget/"+encodeURIComponent(b.id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({bedrag})});
   const d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(d.error||"Opslaan mislukt. Probeer het opnieuw.");
   await loadTrip();renderAll();
@@ -718,7 +796,8 @@ function show(tab,{scroll=true}={}){
   if(scroll&&vorige!==tab){const n=document.querySelector("nav.tabs");const top=n&&getComputedStyle(n).display!=="none"?Math.min(window.scrollY,n.offsetTop):0;window.scrollTo({top})}
 }
 document.querySelectorAll("nav.tabs button,nav.bnav button").forEach(b=>b.addEventListener("click",()=>show(b.dataset.tab)));
-document.addEventListener("click",e=>{const g=e.target.closest&&e.target.closest("[data-goto]");if(g){e.preventDefault();show(g.dataset.goto);if(g.dataset.openKosten){const d=document.querySelector("#kosten-plekken details");if(d)d.open=true}}});
+document.addEventListener("click",e=>{const g=e.target.closest&&e.target.closest("[data-goto]");if(g){e.preventDefault();show(g.dataset.goto);if(g.dataset.openKosten){const d=document.querySelector("#kosten-plekken details");if(d)d.open=true}
+  if(g.dataset.scroll){const t=document.getElementById(g.dataset.scroll);if(t)setTimeout(()=>t.scrollIntoView({behavior:"smooth",block:"start"}),30)}}});
 const ao=document.getElementById("alles-open");
 if(ao)ao.addEventListener("click",()=>{const ds=[...document.querySelectorAll("#days details")];const open=!ds.every(d=>d.open);ds.forEach(d=>d.open=open);ao.textContent=open?"Alles dichtklappen":"Alles openklappen"});
 const lb=document.createElement("div");lb.id="lb";lb.hidden=true;lb.setAttribute("role","dialog");lb.setAttribute("aria-label","Foto");
@@ -729,7 +808,7 @@ async function loadTrip(){
   const r=await fetch("api/trip",{cache:"no-store"});
   if(!r.ok)throw new Error(r.status);
   const d=await r.json();
-  BASES=d.bases;DAYS=d.days;LEGS=d.legs;CHECK=d.checklist;KAART=d.kaart||KAART;INFO=d.info||[];
+  BASES=d.bases;DAYS=d.days;LEGS=d.legs;CHECK=d.checklist;KAART=d.kaart||KAART;INFO=d.info||[];AUTOS=d.autos||[];BUDGET=d.budget||[];
 }
 // Rol ophalen: gasten kunnen alleen kijken
 const rolKlaar=fetch("api/me",{cache:"no-store"}).then(r=>r.json()).then(d=>{ROLE=d.rol==="gast"?"gast":"admin"}).catch(()=>{}).then(()=>{
@@ -744,7 +823,7 @@ const rolKlaar=fetch("api/me",{cache:"no-store"}).then(r=>r.json()).then(d=>{ROL
     if(document.getElementById("edit")&&!document.getElementById("edit").hidden)show("route");
   }
 });
-function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawCheck();drawKosten();drawInfo();drawCount();drawVandaag()}
+function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawAutos();drawCheck();drawKosten();drawInfo();drawCount();drawVandaag()}
 const h=(location.hash||"").slice(1);
 let startTab="route";try{startTab=localStorage.getItem("thai27-tab")||"route"}catch(e){}
 if(["route","dagen","plekken","check","info","edit"].includes(h))startTab=h;

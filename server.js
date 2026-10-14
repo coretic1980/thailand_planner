@@ -115,13 +115,15 @@ app.get("/api/me", (req, res) => res.json({ rol: roleOf(req) }));
 // Alle reisgegevens in één keer
 app.get("/api/trip", async (_req, res, next) => {
   try {
-    const [bases, days, legs, check, kaart, info] = await Promise.all([
+    const [bases, days, legs, check, kaart, info, autos, budget] = await Promise.all([
       db.query("select * from bases order by nr"),
       db.query("select to_char(day_date,'YYYY-MM-DD') as iso, * from days order by day_date"),
       db.query("select * from legs order by sort"),
       db.query("select *, to_char(deadline,'YYYY-MM-DD') as deadline_iso from checklist order by sort"),
       db.query("select route, tussenstops, dagtrips from kaart where id = 'kaart'"),
       db.query("select id, sectie, label, waarde, tekst from info order by sectie, sort, id"),
+      db.query("select * from autohuur order by sort, id"),
+      db.query("select * from budget order by sort, id"),
     ]);
     const k = kaart.rows[0] || { route: [], tussenstops: [], dagtrips: [] };
     res.set("Cache-Control", "no-store");
@@ -144,6 +146,13 @@ app.get("/api/trip", async (_req, res, next) => {
         updatedAt: c.updated_at, groep: c.groep || null, deadline: c.deadline_iso || null, deadlineLabel: c.deadline_label || null,
       })),
       info: info.rows,
+      autos: autos.rows.map((a) => ({
+        id: a.id, verhuurder: a.verhuurder, auto: a.auto, reservering: a.reservering, status: a.status,
+        ophalen: a.ophalen, ophalenPlek: a.ophalen_plek, inleveren: a.inleveren, inleverenPlek: a.inleveren_plek,
+        prijs: a.prijs == null ? null : Number(a.prijs), terPlaatse: a.ter_plaatse == null ? null : Number(a.ter_plaatse),
+        terPlaatseTekst: a.ter_plaatse_tekst, borg: a.borg, details: a.details || [], url: a.url, notitie: a.notitie,
+      })),
+      budget: budget.rows.map((b) => ({ id: b.id, label: b.label, bedrag: b.bedrag == null ? null : Number(b.bedrag), toelichting: b.toelichting })),
     });
   } catch (e) {
     next(e);
@@ -171,6 +180,8 @@ app.patch("/api/checklist/:id", requireAdmin, async (req, res, next) => {
 const assistant = require("./assistant");
 
 // Prijs van een overnachting direct aanpassen (veld in de kostenlijst)
+app.patch("/api/budget/:id", requireAdmin, handle((req) => assistant.setBudget(req.params.id, req.body?.bedrag ?? null)));
+app.patch("/api/autohuur/:id/prijs", requireAdmin, handle((req) => assistant.setAutoPrice(req.params.id, req.body?.veld, req.body?.prijs ?? null)));
 app.patch("/api/bases/:id/prijs", requireAdmin, handle((req) => assistant.setPrice(req.params.id, req.body?.prijs ?? null)));
 
 // Eenvoudige limiet: maximaal 30 voorstellen per uur (beschermt je API-tegoed)

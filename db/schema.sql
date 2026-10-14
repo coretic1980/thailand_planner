@@ -91,3 +91,31 @@ create table if not exists info (
   waarde  text,
   tekst   text
 );
+-- Huurauto als eigen reservering met alle details, en meegeteld in de reiskosten
+create table if not exists autohuur (
+  id                text primary key,
+  sort              int  not null default 1,
+  verhuurder        text not null,
+  auto              text not null,
+  reservering       text,
+  status            text,
+  ophalen           text not null,
+  ophalen_plek      text,
+  inleveren         text not null,
+  inleveren_plek    text,
+  prijs             numeric(10,2),
+  ter_plaatse       numeric(10,2),
+  ter_plaatse_tekst text,
+  borg              text,
+  details           text[] not null default '{}',
+  url               text,
+  notitie           text
+);
+-- Geschatte kosten naast de boekingen: eten en drinken, uitstapjes, benzine
+create table if not exists budget (
+  id          text primary key,
+  sort        int  not null default 1,
+  label       text not null,
+  bedrag      numeric(10,2),
+  toelichting text
+);
