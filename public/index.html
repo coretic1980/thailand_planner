@@ -59,8 +59,9 @@ header.hero{padding-block:14px 8px}
 body:not([data-tab="route"]) .hero-img,body:not([data-tab="route"]) .hero .sub{display:none}
 @media (max-width:719px){body:not([data-tab="route"]) .count{display:none}body:not([data-tab="route"]) h1{font-size:24px}}
 .offline{background:var(--sun-soft);color:var(--fg);border-radius:10px;padding:8px 12px;font-size:13px;margin-top:8px}
-.offline.nieuw{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--sea-soft)}
-.offline.nieuw[hidden]{display:none}
+.toast-nieuw{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top,0px));z-index:60;width:min(520px,calc(100% - 32px));display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--sea-soft);color:var(--fg);border:1px solid var(--sea);border-radius:14px;padding:12px 14px;font-size:14px;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.toast-nieuw[hidden]{display:none}
+.toast-nieuw button{min-height:44px;white-space:nowrap}
 
 /* Navigatie: telefoon onderin, groter bovenin */
 nav.tabs{display:none}
@@ -273,7 +274,6 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
     <h1 id="hero-titel">Thailand</h1>
     <p class="sub" id="hero-tekst"></p>
     <div class="count" id="count"></div>
-    <div class="offline nieuw" id="nieuwe-versie" hidden>Er is een nieuwe versie van de app. <button type="button" class="ghost" id="nieuwe-versie-knop">Nu verversen</button></div>
     <div class="offline" id="offline" hidden>Je bent offline. Je ziet de laatst geladen gegevens; wijzigingen kunnen pas als je weer verbinding hebt.</div>
     <img class="hero-img zoom" id="hero-img" src="img/13-samet-nangshe.jpg" alt="Phang Nga Bay" data-cap="Phang Nga Bay">
   </header>
@@ -390,6 +390,7 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
   <button type="button" data-tab="info" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>Info</button>
 </nav>
 
+<div class="toast-nieuw" id="nieuwe-versie" role="status" aria-live="polite" hidden><div><b>Nieuwe versie van de app</b><div id="nieuwe-versie-tekst">De app ververst over 5 seconden.</div></div><button type="button" class="primary" id="nieuwe-versie-knop">Nu verversen</button></div>
 <script>
 let BASES=[],DAYS=[],LEGS=[],CHECK=[],INFO=[],KAART={route:[],tussenstops:[],dagtrips:[]};
 let ROLE="admin"; // "gast" kan alleen kijken
@@ -840,20 +841,33 @@ let dataVersie=null,appVersie=null,nieuweApp=false;
 function bezig(){
   const a=document.activeElement;
   if(a&&(a.tagName==="INPUT"||a.tagName==="TEXTAREA")&&a.type!=="checkbox")return true;
-  const p=document.getElementById("ai-prompt");if(p&&p.value.trim())return true;
   return !!proposal;
 }
-function verversNaarNieuweApp(){
-  if(bezig()){const el=document.getElementById("nieuwe-versie");if(el)el.hidden=false;return}
-  try{sessionStorage.setItem("thai27-scroll",String(window.scrollY))}catch(e){}
+let aftel=null;
+function nuVerversen(){
+  try{sessionStorage.setItem("thai27-scroll",String(window.scrollY));
+    const pr=document.getElementById("ai-prompt");if(pr&&pr.value.trim())sessionStorage.setItem("thai27-prompt",pr.value)}catch(e){}
   location.reload();
+}
+// Melding tonen en na 5 seconden verversen; ben je aan het typen, dan wacht hij tot je klaar bent
+function verversNaarNieuweApp(){
+  const el=document.getElementById("nieuwe-versie"),tk=document.getElementById("nieuwe-versie-tekst");
+  el.hidden=false;
+  if(bezig()){clearInterval(aftel);aftel=null;tk.textContent="De app ververst zodra je klaar bent met typen.";return}
+  if(aftel)return;
+  let n=5;tk.textContent=`De app ververst over ${n} seconden.`;
+  aftel=setInterval(()=>{
+    if(bezig()){clearInterval(aftel);aftel=null;tk.textContent="De app ververst zodra je klaar bent met typen.";return}
+    n--;if(n<=0){clearInterval(aftel);nuVerversen();return}
+    tk.textContent=`De app ververst over ${n} ${n===1?"seconde":"seconden"}.`;
+  },1000);
 }
 async function checkVersie(){
   if(document.visibilityState!=="visible")return;
   try{
     const {versie,app}=await api("api/versie");
     if(app){
-      if(appVersie&&app!==appVersie){nieuweApp=true;verversNaarNieuweApp();return}
+      if(appVersie&&app!==appVersie){if(!nieuweApp){nieuweApp=true;verversNaarNieuweApp()}return}
       appVersie=app;
     }
     if(dataVersie&&versie!==dataVersie){
@@ -872,10 +886,11 @@ document.addEventListener("visibilitychange",checkVersie);
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(reg=>reg.update()).catch(()=>{}));
 function offlineMelding(){const el=document.getElementById("offline");if(el)el.hidden=navigator.onLine}
 window.addEventListener("online",()=>{offlineMelding();checkVersie()});
-document.getElementById("nieuwe-versie-knop").addEventListener("click",()=>location.reload());
+document.getElementById("nieuwe-versie-knop").addEventListener("click",nuVerversen);
 // Na het typen alsnog verversen als er intussen een nieuwe versie klaarstaat
 document.addEventListener("focusout",()=>setTimeout(()=>{if(nieuweApp&&!bezig())verversNaarNieuweApp()},300));
-// Na een automatische verversing terug naar dezelfde plek op de pagina
+// Na een automatische verversing terug naar dezelfde plek op de pagina, met een half getypte vraag er nog in
+try{const t=sessionStorage.getItem("thai27-prompt");if(t!==null){sessionStorage.removeItem("thai27-prompt");document.getElementById("ai-prompt").value=t}}catch(e){}
 try{const y=sessionStorage.getItem("thai27-scroll");if(y!==null){sessionStorage.removeItem("thai27-scroll");window.addEventListener("load",()=>setTimeout(()=>window.scrollTo(0,Number(y)),400))}}catch(e){}window.addEventListener("offline",offlineMelding);offlineMelding();
 </script>
 </body>
