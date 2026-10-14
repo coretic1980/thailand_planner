@@ -8,12 +8,13 @@
 <title>Thailand Roadtrip 2027</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
 <style>
-/* Layout: phone-first travel companion — sticky tab bar, one column, cards only for the places themselves */
+/* Layout: telefoon eerst — vaste navigatie onderin; vanaf 720px tabbladen bovenin; vanaf 1000px brede indeling */
 :root{
   --bg:#f3f6f5; --surface:#ffffff; --fg:#14302e; --muted:#5b726f; --line:#d8e2df;
   --sea:#0e6e6a; --sea-soft:#d7ecea; --sun:#e2603b; --sun-soft:#fbe3da; --land:#e7e4d6; --water:#cfe6ea;
   --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --body:"Nunito Sans", "Segoe UI", system-ui, sans-serif;
+  --nav-h:64px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0d1a1a; --surface:#142625; --fg:#e4efed; --muted:#93aaa6; --line:#24403d;
@@ -22,115 +23,231 @@
   --bg:#0d1a1a; --surface:#142625; --fg:#e4efed; --muted:#93aaa6; --line:#24403d;
   --sea:#4fc2b8; --sea-soft:#183a38; --sun:#f08a63; --sun-soft:#3a2219; --land:#22302c; --water:#10292d; color-scheme:dark}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
-.wrap{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
-header.hero{padding-block:28px 18px}
-.topbar{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:-14px 0 10px}
-.topbar a.ghost{padding:6px 12px;font-size:13px;text-decoration:none;display:inline-block}
-.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--sea);font-weight:700}
-h1{font-family:var(--display);font-weight:800;font-size:clamp(30px,7vw,46px);line-height:1.02;margin:.25em 0 .2em;text-wrap:balance}
-h2{font-family:var(--display);font-weight:800;font-size:24px;margin:28px 0 10px;text-wrap:balance}
-h3{font-family:var(--display);font-weight:600;font-size:19px;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+.wrap{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:0 calc(var(--nav-h) + 32px + env(safe-area-inset-bottom,0px))}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(26px,7vw,46px);line-height:1.02;margin:.2em 0 .15em;text-wrap:balance}
+h2{font-family:var(--display);font-weight:800;font-size:22px;margin:24px 0 10px;text-wrap:balance}
+h3{font-family:var(--display);font-weight:600;font-size:18px;margin:0}
 .sub{color:var(--muted);margin:0}
-.count{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;font-variant-numeric:tabular-nums}
-.count b{font-family:var(--display);font-size:26px;color:var(--sun)}
+.note{font-size:13px;color:var(--muted)}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--sea);font-weight:700}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--sea-soft);color:var(--sea);margin-right:6px;white-space:nowrap}
+.chip.drive{background:var(--sun-soft);color:var(--sun)}
+.chip.warn{background:var(--sun);color:#fff}
+button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
+.primary,.ghost{font:700 14px var(--body);border-radius:10px;padding:10px 16px;cursor:pointer;justify-self:start;text-decoration:none;display:inline-block}
+.primary{background:var(--sea);color:var(--bg);border:1px solid var(--sea)}
+.primary[disabled]{opacity:.55;cursor:wait}
+.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.links{display:flex;flex-wrap:wrap;gap:8px}
+.links a{font-size:13px;font-weight:700;color:var(--sea);text-decoration:none;border:1px solid var(--line);padding:8px 10px;border-radius:8px;min-height:36px;display:inline-flex;align-items:center}
+.links a:hover{border-color:var(--sea)}
+
+/* Kop */
+header.hero{padding-block:14px 8px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;min-height:32px}
+.topbar .eyebrow{flex:1;min-width:0}
+.topbar .acc{display:flex;gap:8px;align-items:center}
+.topbar a.ghost{padding:5px 12px;font-size:13px}
+.hero .sub{font-size:14px}
+.count{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-variant-numeric:tabular-nums}
+.count b{font-family:var(--display);font-size:20px;color:var(--sun)}
 .count span{color:var(--muted);font-size:13px}
-nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding-block:10px;border-bottom:1px solid var(--line)}
-nav.tabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 14px var(--body);padding:8px 14px;border-radius:999px;cursor:pointer}
-nav.tabs button[aria-selected="true"]{background:var(--sea);border-color:var(--sea);color:var(--bg)}
-button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
-.map-box{background:var(--water);border-radius:14px;overflow:hidden;margin-top:14px}
-.map-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
-@media (max-width:640px){.map-row{grid-template-columns:1fr}}
-svg{display:block;width:100%;height:auto}
-.kaart-info{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:10px}
+.hero-img{width:100%;aspect-ratio:5/2;object-fit:cover;border-radius:14px;display:block;margin-top:12px;cursor:zoom-in}
+body:not([data-tab="route"]) .hero-img,body:not([data-tab="route"]) .hero .sub{display:none}
+@media (max-width:719px){body:not([data-tab="route"]) .count{display:none}body:not([data-tab="route"]) h1{font-size:24px}}
+.offline{background:var(--sun-soft);color:var(--fg);border-radius:10px;padding:8px 12px;font-size:13px;margin-top:8px}
+
+/* Navigatie: telefoon onderin, groter bovenin */
+nav.tabs{display:none}
+nav.bnav{position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -4px 16px rgba(0,0,0,.06)}
+nav.bnav button{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:var(--nav-h);font:700 11px var(--body);color:var(--muted);-webkit-tap-highlight-color:transparent}
+nav.bnav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.bnav button[aria-selected="true"]{color:var(--sea)}
+nav.bnav button[aria-selected="true"] svg{stroke-width:2.3}
+nav.bnav button:focus-visible{outline:2px solid var(--sun);outline-offset:-4px}
+@media (min-width:720px){
+  nav.bnav{display:none}
+  .wrap{padding-bottom:48px}
+  nav.tabs{position:sticky;top:0;z-index:15;background:var(--bg);display:flex;gap:6px;overflow-x:auto;padding-block:10px;border-bottom:1px solid var(--line)}
+  nav.tabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 14px var(--body);padding:8px 14px;border-radius:999px;cursor:pointer}
+  nav.tabs button[aria-selected="true"]{background:var(--sea);border-color:var(--sea);color:var(--bg)}
+  header.hero{padding-block:22px 12px}
+  .count b{font-size:24px}
+}
+
+/* Vandaag / nog te regelen */
+.vandaag{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--sun);border-radius:12px;padding:12px 14px;margin:12px 0 4px;display:grid;gap:6px}
+.vandaag h3{font-size:18px}
+.vandaag ul{margin:0;padding-left:18px}
+.vandaag .rij{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+
+/* Route en kaart */
+.map-row{display:grid;grid-template-columns:1fr;gap:18px;align-items:start}
+.map-box{position:relative;background:var(--water);border-radius:14px;overflow:hidden;margin-top:12px}
+.map-box svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.map-box.zoomed svg{touch-action:none;cursor:grab}
+.zoomknoppen{position:absolute;right:8px;top:8px;display:grid;gap:6px}
+.zoomknoppen button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:800 20px var(--body);cursor:pointer;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-top:8px;align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend svg{width:16px;height:16px}
+.kaart-info{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;margin-top:10px}
 .kaart-info h3{margin:4px 0 4px}
 .kaart-info p{margin:0 0 8px}
-.kaart-info .links{display:flex;flex-wrap:wrap;gap:8px 14px}
-.trips{list-style:none;margin:0;padding:0;display:grid;gap:2px}
-.trips button{all:unset;box-sizing:border-box;display:grid;grid-template-columns:26px 74px 1fr;gap:8px;align-items:center;width:100%;padding:8px 6px;border-radius:8px;cursor:pointer;font-size:14px}
-.trips button:hover,.trips button[aria-pressed=true]{background:var(--line)}
+.kaart-info .links a{border:1px solid var(--line)}
+.trips,.legs{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.trips button{all:unset;box-sizing:border-box;display:grid;grid-template-columns:28px 74px 1fr;gap:8px;align-items:center;width:100%;min-height:44px;padding:6px;border-radius:8px;cursor:pointer;font-size:14px}
+.trips button:hover,.trips button[aria-pressed=true]{background:var(--sea-soft)}
 .trips button:focus-visible{outline:2px solid var(--sea)}
-.trips .nr{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--sea);color:var(--surface);font-size:12px;font-weight:800}
-.trips .nr.stop{background:var(--surface);color:var(--sea);border:2px solid var(--sea);width:18px;height:18px}
-.trips .d{color:var(--muted);font-size:13px}
-.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-top:8px}
-.legs{list-style:none;margin:0;padding:0;display:grid;gap:2px}
-.legs li{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
-.legs .d{color:var(--muted);font-size:13px}
+.trips .nr{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--sea);color:var(--surface);font-size:12px;font-weight:800}
+.trips .nr.stop{background:var(--surface);color:var(--sea);border:2px solid var(--sea)}
+.trips .d,.legs .d{color:var(--muted);font-size:13px}
+.legs li{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
 .legs .t{font-weight:700;color:var(--sun);font-size:13px;white-space:nowrap}
-.day{display:grid;grid-template-columns:64px minmax(0,1fr);gap:14px;padding:14px 0;border-bottom:1px solid var(--line)}
-.day.today{background:var(--sun-soft);border-radius:10px;padding-inline:10px}
-.date{font-variant-numeric:tabular-nums;text-align:center}
-.date .n{font-family:var(--display);font-size:28px;font-weight:800;line-height:1}
-.date .w{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.day h3{font-size:17px}
-.day ul{margin:6px 0 0;padding-left:18px}
-.chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--sea-soft);color:var(--sea);margin-right:6px}
-.chip.drive{background:var(--sun-soft);color:var(--sun)}
-.places{display:grid;gap:18px}
-.place{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.band{position:relative;aspect-ratio:16/9;max-width:100%;background:var(--sea-soft);overflow:hidden}
-.band.nofoto{aspect-ratio:16/5;background:linear-gradient(120deg,var(--sea),var(--sun))}
+@media (min-width:720px){.map-row{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}.map-col{position:sticky;top:70px}}
+
+/* Dag per dag */
+.datestrip{display:flex;gap:6px;overflow-x:auto;padding:8px 0 10px;scrollbar-width:none;position:sticky;top:0;z-index:5;background:var(--bg);margin-inline:-16px;padding-inline:16px}
+.datestrip::-webkit-scrollbar{display:none}
+.datestrip button{all:unset;cursor:pointer;flex:0 0 auto;width:46px;padding:6px 0;border-radius:10px;border:1px solid var(--line);background:var(--surface);text-align:center;font-variant-numeric:tabular-nums}
+.datestrip button b{display:block;font-family:var(--display);font-size:18px;line-height:1.1}
+.datestrip button span{font-size:11px;color:var(--muted);text-transform:uppercase}
+.datestrip button.today{border-color:var(--sun)}
+.datestrip button[aria-current="true"]{background:var(--sea);border-color:var(--sea);color:var(--bg)}
+.datestrip button[aria-current="true"] span{color:var(--bg)}
+.daglijst{display:grid;gap:8px}
+details.day{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;scroll-margin-top:80px}
+details.day.today{border-color:var(--sun);box-shadow:0 0 0 1px var(--sun)}
+details.day summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:48px minmax(0,1fr) 20px;gap:12px;align-items:center;padding:10px 12px;min-height:56px}
+details.day summary::-webkit-details-marker{display:none}
+details.day summary::after{content:"";width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);justify-self:center;margin-top:-4px;transition:transform .2s}
+details.day[open] summary::after{transform:rotate(-135deg);margin-top:4px}
+.date{font-variant-numeric:tabular-nums;text-align:center;line-height:1.1}
+.date .n{font-family:var(--display);font-size:24px;font-weight:800}
+.date .w{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.day .tt{min-width:0}
+.day .tt h3{font-size:16px;margin-top:2px}
+.day .body{padding:0 14px 14px 72px}
+.day ul{margin:0;padding-left:18px}
+.day .thumb{width:100%;max-width:420px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;display:block;margin-top:10px;cursor:zoom-in}
+.day-md{display:none}
+.alles{display:flex;justify-content:flex-end;margin:-4px 0 6px}
+.alles button{all:unset;cursor:pointer;font-size:13px;font-weight:700;color:var(--sea);padding:6px 0}
+@media (max-width:480px){.day .body{padding-left:14px}}
+@media (min-width:1000px){
+  .datestrip,.daglijst,.alles{display:none}
+  .day-md{display:grid;grid-template-columns:280px minmax(0,1fr);gap:20px;align-items:start}
+  .day-md .lijst{display:grid;gap:4px;position:sticky;top:70px;max-height:calc(100vh - 90px);overflow:auto}
+  .day-md .lijst button{all:unset;cursor:pointer;display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;padding:8px 10px;border-radius:10px;border:1px solid transparent}
+  .day-md .lijst button:hover{background:var(--surface)}
+  .day-md .lijst button[aria-current="true"]{background:var(--surface);border-color:var(--sea)}
+  .day-md .lijst button.today .date .n{color:var(--sun)}
+  .day-md .lijst .t{font-size:14px;font-weight:600}
+  .day-md .detail{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .day-md .detail h3{font-size:24px;font-family:var(--display);font-weight:800;margin:6px 0 10px}
+  .day-md .detail ul{padding-left:20px;margin:0}
+  .day-md .detail li{margin-bottom:4px}
+  .day-md .detail img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-top:14px;cursor:zoom-in}
+  .day-md .nav2{display:flex;justify-content:space-between;margin-top:14px}
+}
+
+/* Overnachtingen */
+.kosten{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;margin:4px 0 16px}
+.kosten .tot{font-size:22px;font-weight:800}
+.kosten summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.kosten summary::-webkit-details-marker{display:none}
+.kosten .open-txt{font-size:13px;font-weight:700;color:var(--sea);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.kosten .open-txt::after{content:"";width:8px;height:8px;border-right:2px solid var(--sea);border-bottom:2px solid var(--sea);transform:rotate(45deg);margin-top:-4px;transition:transform .2s}
+.kosten details[open] .open-txt::after{transform:rotate(-135deg);margin-top:4px}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl td:first-child{color:var(--muted);width:42%;padding-right:10px}
+.kosten .tbl td:first-child{width:auto}
+.kosten .tbl td:last-child{text-align:right;white-space:nowrap}
+.kosten .tbl tr.som td{font-weight:700;color:var(--fg);border-bottom:0}
+.kosten .tbl td{vertical-align:middle}
+.kosten input.prijs{width:110px;min-height:40px;text-align:right;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+.kosten input.prijs:focus{outline:2px solid var(--sea);outline-offset:1px}
+.places{display:grid;gap:10px;align-items:start}
+details.place{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;scroll-margin-top:80px}
+details.place summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:72px minmax(0,1fr) 20px;gap:12px;align-items:center;padding:10px 12px 10px 10px}
+details.place summary::-webkit-details-marker{display:none}
+details.place summary::after{content:"";width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);justify-self:center;margin-top:-4px;transition:transform .2s}
+details.place[open] summary::after{transform:rotate(-135deg);margin-top:4px}
+.pthumb{position:relative;width:72px;height:72px;border-radius:10px;overflow:hidden;background:linear-gradient(135deg,var(--sea),var(--sun));display:grid;place-items:center}
+.pthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.pthumb .num{position:absolute;left:4px;top:4px;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:rgba(10,25,24,.78);color:#fff;font:800 12px/22px var(--body);text-align:center}
+.pthumb .num.big{position:static;background:none;font:800 30px var(--display);color:#fff}
+.place .kop h3{font-size:17px}
+.place .kop .meta{font-size:13px;color:var(--muted);margin-top:1px}
+.place .kop .meta b{color:var(--fg)}
+.band{position:relative;aspect-ratio:16/9;overflow:hidden;background:var(--sea-soft)}
 .band img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
-.band .num,.band .when{position:absolute;bottom:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.55)}
-.band .num{left:16px;font-family:var(--display);font-weight:800;font-size:44px;line-height:1}
-.band .when{right:16px;font-weight:700;font-size:13px;bottom:16px}
-.hero-img{width:100%;aspect-ratio:21/9;object-fit:cover;border-radius:14px;display:block;margin-top:16px;max-width:100%}
-.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
-.strip figure{margin:0;min-width:0}
-.strip img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;display:block;cursor:zoom-in}
-.strip figcaption{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.3}
-.day .thumb{width:100%;max-width:320px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;display:block;margin-top:10px;cursor:zoom-in}
-#lb{position:fixed;inset:0;z-index:20;background:rgba(5,15,15,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:10px}
-#lb img{max-width:100%;max-height:82vh;border-radius:10px}
-#lb p{color:#e4efed;margin:0;font-size:14px;text-align:center}
-#lb button{background:none;border:1px solid #93aaa6;color:#e4efed;font:600 14px var(--body);padding:6px 14px;border-radius:999px;cursor:pointer}
+.band .when{position:absolute;right:10px;bottom:10px;background:rgba(10,25,24,.78);color:#fff;font-weight:700;font-size:13px;padding:3px 10px;border-radius:999px}
 .place .in{padding:14px 16px 16px;display:grid;gap:10px}
 .kv{display:grid;grid-template-columns:76px minmax(0,1fr);gap:4px 10px;font-size:14px}
 .kv dt{color:var(--muted)}
 .kv dd{margin:0}
 .kv dd a{color:var(--sea)}
 .hotelfoto{display:block;width:100%;max-width:320px;aspect-ratio:3/2;object-fit:cover;border-radius:10px;margin:2px 0 8px;cursor:zoom-in}
-.links{display:flex;flex-wrap:wrap;gap:8px}
-.links a{font-size:13px;font-weight:700;color:var(--sea);text-decoration:none;border:1px solid var(--line);padding:6px 10px;border-radius:8px}
-.links a:hover{border-color:var(--sea)}
-.check{list-style:none;padding:0;margin:0}
-.check li{border-bottom:1px solid var(--line)}
-.check label{display:flex;gap:12px;align-items:flex-start;padding:12px 0;cursor:pointer}
-.check input{width:20px;height:20px;accent-color:var(--sea);margin-top:1px;flex:0 0 auto}
-.check .done{text-decoration:line-through;color:var(--muted)}
-.check small{display:block;color:var(--muted)}
+.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.strip figure{margin:0;min-width:0}
+.strip img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;display:block;cursor:zoom-in}
+.strip figcaption{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.3}
+
+/* Regelen */
+.totaalregel{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.totaalregel b{font-size:18px}
+.totaalregel a{font-size:13px;font-weight:700;color:var(--sea);text-decoration:none;white-space:nowrap}
 .prog{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:6px 0 4px}
 .prog i{display:block;height:100%;background:var(--sea);width:0;transition:width .3s}
-.info{display:grid;gap:14px}
+.groepen{display:grid;gap:4px}
+.groep h3{font-size:16px;margin:16px 0 4px;display:flex;justify-content:space-between;align-items:baseline}
+.groep h3 span{font:600 12px var(--body);color:var(--muted)}
+.check{list-style:none;padding:0;margin:0}
+.check li{border-bottom:1px solid var(--line)}
+.check label{display:flex;gap:12px;align-items:flex-start;padding:12px 0;cursor:pointer;min-height:44px}
+.check input{width:24px;height:24px;accent-color:var(--sea);margin:0;flex:0 0 auto}
+.check .tekst{min-width:0}
+.check .done{color:var(--muted)}
+.check .done .titel{text-decoration:line-through}
+.check small{display:block;color:var(--muted)}
+.check .chip{margin-top:4px}
+@media (min-width:1000px){.groepen{grid-template-columns:1fr 1fr;column-gap:28px}}
+
+/* Info */
 .flight{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
 @media (max-width:480px){.flight{grid-template-columns:1fr}}
 .fl{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;font-variant-numeric:tabular-nums}
 .fl .big{font-family:var(--display);font-size:28px;font-weight:800}
 .fl .lab{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.tbl{width:100%;border-collapse:collapse;font-size:14px}
-.tbl td{padding:8px 0;border-bottom:1px solid var(--line);vertical-align:top}
-.tbl td:first-child{color:var(--muted);width:42%;padding-right:10px}
-.note{font-size:13px;color:var(--muted)}
-.kosten{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:4px 0 18px}
-.kosten .tot{font-size:22px;font-weight:800}
-.kosten .tbl td:first-child{width:auto}
-.kosten .tbl td:last-child{text-align:right;white-space:nowrap}
-.kosten .tbl tr.som td{font-weight:700;color:var(--fg);border-bottom:0}
-.kosten .tbl td{vertical-align:middle}
-.kosten input.prijs{width:110px;text-align:right;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
-.kosten input.prijs:focus{outline:2px solid var(--sea);outline-offset:1px}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
-[hidden]{display:none!important}
+.beheer{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+@media (min-width:720px){.beheer.mobiel{display:none}}
+@media (min-width:1000px){.infogrid{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}}
+
+/* Brede schermen */
+@media (min-width:1000px){
+  .wrap{max-width:1180px;padding-inline:24px}
+  header.hero{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:8px 32px;align-items:end}
+  header.hero .topbar{grid-column:1/-1}
+  .hero-img{grid-column:2;grid-row:2/span 4;margin-top:0;aspect-ratio:16/9}
+  body:not([data-tab="route"]) header.hero{grid-template-columns:1fr}
+  .map-box svg{max-height:calc(100vh - 140px)}
+  .places{grid-template-columns:1fr 1fr}
+}
+
+#lb{position:fixed;inset:0;z-index:30;background:rgba(5,15,15,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:10px}
+#lb img{max-width:100%;max-height:82vh;border-radius:10px}
+#lb p{color:#e4efed;margin:0;font-size:14px;text-align:center}
+#lb button{background:none;border:1px solid #93aaa6;color:#e4efed;font:600 14px var(--body);padding:6px 14px;border-radius:999px;cursor:pointer}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 .ai{display:grid;gap:10px;margin-top:12px}
 .ai textarea{width:100%;font:15px/1.5 var(--body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;resize:vertical}
 .ex{display:flex;flex-wrap:wrap;gap:6px}
 .ex button{font:13px var(--body);color:var(--sea);background:var(--sea-soft);border:0;border-radius:999px;padding:6px 12px;cursor:pointer;text-align:left}
-.primary,.ghost{font:700 14px var(--body);border-radius:10px;padding:10px 16px;cursor:pointer;justify-self:start}
-.primary{background:var(--sea);color:var(--bg);border:1px solid var(--sea)}
-.primary[disabled]{opacity:.55;cursor:wait}
-.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
 .proposal{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--sun);border-radius:12px;padding:14px 16px;display:grid;gap:12px}
 .proposal h3{font-size:16px}
 .chg{display:grid;gap:4px}
@@ -144,19 +261,17 @@ svg{display:block;width:100%;height:auto}
 .hist .when{color:var(--muted);font-size:12px}
 .hist .undone{color:var(--muted);text-decoration:line-through}
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-body{margin:0}
-img{max-width:100%}
 </style>
 </head>
-<body>
+<body data-tab="route">
 
 <div class="wrap">
   <header class="hero">
-    <div class="topbar" id="topbar" hidden><span class="chip" id="rol-chip"></span><a class="ghost" href="logout">Uitloggen</a></div>
-    <div class="eyebrow" id="hero-label">Gezinsreis</div>
+    <div class="topbar"><div class="eyebrow" id="hero-label">Gezinsreis</div><div class="acc" id="topbar" hidden><span class="chip" id="rol-chip"></span><a class="ghost" href="logout">Uitloggen</a></div></div>
     <h1 id="hero-titel">Thailand</h1>
     <p class="sub" id="hero-tekst"></p>
     <div class="count" id="count"></div>
+    <div class="offline" id="offline" hidden>Je bent offline. Je ziet de laatst geladen gegevens; wijzigingen kunnen pas als je weer verbinding hebt.</div>
     <img class="hero-img zoom" id="hero-img" src="img/13-samet-nangshe.jpg" alt="Phang Nga Bay" data-cap="Phang Nga Bay">
   </header>
 
@@ -164,22 +279,32 @@ img{max-width:100%}
     <button role="tab" id="t-route" aria-selected="true" data-tab="route">Route</button>
     <button role="tab" id="t-dagen" aria-selected="false" data-tab="dagen">Dag per dag</button>
     <button role="tab" id="t-plekken" aria-selected="false" data-tab="plekken">Overnachtingen</button>
-    <button role="tab" id="t-check" aria-selected="false" data-tab="check">Reserveren</button>
+    <button role="tab" id="t-check" aria-selected="false" data-tab="check">Regelen</button>
     <button role="tab" id="t-info" aria-selected="false" data-tab="info">Info</button>
     <button role="tab" id="t-edit" aria-selected="false" data-tab="edit">Aanpassen</button>
   </nav>
 
   <section id="route" role="tabpanel">
+    <div id="vandaag"></div>
     <div class="map-row">
-      <div>
-        <div class="map-box"><svg id="map" viewBox="0 0 370 670" role="img" aria-label="Schematische kaart van de route"></svg></div>
-        <div class="legend"><span>● overnachting</span><span>○ stop onderweg</span><span>● uitstapje (blauw)</span><span>Tik op een punt voor details</span><span>Kaart is schematisch</span></div>
+      <div class="map-col">
+        <div class="map-box" id="map-box">
+          <svg id="map" viewBox="-24 0 394 670" role="img" aria-label="Schematische kaart van de route"></svg>
+          <div class="zoomknoppen"><button type="button" id="zoom-in" aria-label="Inzoomen">+</button><button type="button" id="zoom-uit" aria-label="Uitzoomen">−</button><button type="button" id="zoom-reset" aria-label="Hele kaart" hidden>⤢</button></div>
+        </div>
+        <div class="legend">
+          <span><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="var(--sun)"/></svg>overnachting</span>
+          <span><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="var(--surface)" stroke="var(--sea)" stroke-width="2"/></svg>stop onderweg</span>
+          <span><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="var(--sea)"/></svg>uitstapje</span>
+          <span><svg viewBox="0 0 16 16"><path d="M1 8h14" stroke="var(--sun)" stroke-width="3"/></svg>route</span>
+          <span>Kaart is schematisch · tik op een punt</span>
+        </div>
         <div class="kaart-info" id="kaart-info" hidden aria-live="polite"></div>
       </div>
       <div>
-        <h2 style="margin-top:14px">Ritten</h2>
+        <h2 style="margin-top:12px">Ritten</h2>
         <ul class="legs" id="legs"></ul>
-        <p class="note">Rijtijden zijn schattingen zonder pauzes. Tik op een overnachting op de kaart voor details.</p>
+        <p class="note">Rijtijden zijn schattingen zonder pauzes.</p>
         <h2 style="margin-top:18px">Uitstapjes</h2>
         <ol class="trips" id="trips"></ol>
       </div>
@@ -188,7 +313,10 @@ img{max-width:100%}
 
   <section id="dagen" role="tabpanel" hidden>
     <h2>Dag per dag</h2>
-    <div id="days"></div>
+    <div class="datestrip" id="datestrip" aria-label="Kies een dag"></div>
+    <div class="alles"><button type="button" id="alles-open">Alles openklappen</button></div>
+    <div id="days" class="daglijst"></div>
+    <div class="day-md" id="day-md"></div>
   </section>
 
   <section id="plekken" role="tabpanel" hidden>
@@ -198,27 +326,34 @@ img{max-width:100%}
   </section>
 
   <section id="check" role="tabpanel" hidden>
-    <h2>Reserveren</h2>
-    <div class="kosten" id="kosten-check"></div>
+    <h2>Regelen</h2>
+    <div class="totaalregel" id="kosten-sum"></div>
     <div class="prog"><i id="bar"></i></div>
     <p class="note" id="progtxt"></p>
-    <ul class="check" id="checklist"></ul>
+    <div class="groepen" id="checklist"></div>
     <p class="note" id="sync" aria-live="polite">Vinkjes worden gedeeld: iedereen met de app ziet ze.</p>
   </section>
 
   <section id="info" role="tabpanel" hidden>
-    <h2>Vluchten</h2>
-    <div class="flight" id="info-vlucht"></div>
-    <h2>Praktisch</h2>
-    <table class="tbl" id="info-praktisch"></table>
-    <h2>Noodnummers</h2>
-    <table class="tbl" id="info-nood"></table>
-    <h2>Handige Thaise woorden</h2>
-    <table class="tbl" id="info-woorden"></table>
-    <h2>Foto's</h2>
-    <p class="note" id="info-fotos"></p>
+    <div class="beheer mobiel" id="naar-aanpassen" hidden><div><b>Aanpassen</b><div class="note">Wijzig de reis in gewone taal.</div></div><button type="button" class="primary" data-goto="edit">Openen</button></div>
+    <div class="infogrid">
+      <div>
+        <h2>Vluchten</h2>
+        <div class="flight" id="info-vlucht"></div>
+        <h2>Praktisch</h2>
+        <table class="tbl" id="info-praktisch"></table>
+      </div>
+      <div>
+        <h2>Noodnummers</h2>
+        <table class="tbl" id="info-nood"></table>
+        <h2>Handige Thaise woorden</h2>
+        <table class="tbl" id="info-woorden"></table>
+        <h2>Foto's</h2>
+        <p class="note" id="info-fotos"></p>
+      </div>
+    </div>
     <p class="note" id="rol-info" style="margin-top:24px"></p>
-    <p style="margin-top:8px"><a id="logout" class="ghost" href="logout" style="display:inline-block;text-decoration:none">Uitloggen</a></p>
+    <p style="margin-top:8px"><a id="logout" class="ghost" href="logout">Uitloggen</a></p>
   </section>
 
   <section id="edit" role="tabpanel" hidden>
@@ -227,11 +362,11 @@ img{max-width:100%}
     <div id="ai-off" class="note" hidden></div>
     <form id="ai-form" class="ai">
       <label for="ai-prompt" class="eyebrow">Wat wil je aanpassen?</label>
-      <textarea id="ai-prompt" rows="3" maxlength="1000" placeholder="Bijvoorbeeld: verplaats de klimcursus op Railay naar 13 februari"></textarea>
+      <textarea id="ai-prompt" rows="3" maxlength="1000" placeholder="Bijvoorbeeld: verplaats de klimcursus op Railay naar 12 februari"></textarea>
       <div class="ex" id="ai-ex">
         <button type="button">Voeg een reservering toe voor een Thaise kookcursus in Krabi</button>
         <button type="button">Op 9 februari willen we ook een olifantenopvang bezoeken</button>
-        <button type="button">Zet het hotel in Krabi op Dusit Thani Krabi</button>
+        <button type="button">Zet bij Khao Lak gratis annuleren tot 1 februari</button>
         <button type="button">Maak van Phang Nga Bay een tussenstop bij Samet Nangshe en voeg Koh Yao Noi toe als dagtrip</button>
       </div>
       <button type="submit" class="primary" id="ai-go">Voorstel maken</button>
@@ -244,126 +379,228 @@ img{max-width:100%}
   </section>
 </div>
 
+<nav class="bnav" aria-label="Onderdelen">
+  <button type="button" data-tab="route" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg>Route</button>
+  <button type="button" data-tab="dagen" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Dagen</button>
+  <button type="button" data-tab="plekken" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="1.8"/></svg>Hotels</button>
+  <button type="button" data-tab="check" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/></svg>Regelen</button>
+  <button type="button" data-tab="info" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>Info</button>
+</nav>
+
 <script>
 let BASES=[],DAYS=[],LEGS=[],CHECK=[],INFO=[],KAART={route:[],tussenstops:[],dagtrips:[]};
 let ROLE="admin"; // "gast" kan alleen kijken
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const WD=["zo","ma","di","wo","do","vr","za"];
+const MND=["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
+// Datum in Thailand (UTC+7); met ?vandaag=2027-02-06 te testen
+function todayISO(){const p=new URLSearchParams(location.search).get("vandaag");if(p&&/^\d{4}-\d\d-\d\d$/.test(p))return p;return new Date(Date.now()+7*3600e3).toISOString().slice(0,10)}
+const dagNaam=iso=>{const d=new Date(iso+"T12:00:00");return `${WD[d.getDay()]} ${d.getDate()} ${MND[d.getMonth()]}`};
+const mapsLink=q=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q);
+const routeLink=q=>"https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q);
 
+// ---------- Kaart ----------
 const X=lon=>(lon-97.5)*100, Y=lat=>(14.2-lat)*100;
 const LAND=[[98.2,14.2],[101.2,14.2],[101.2,12.7],[100.95,12.65],[100.9,12.95],[100.95,13.35],[100.6,13.5],[100.3,13.48],[100.0,13.35],[99.98,12.8],[99.97,12.55],[100.0,12.2],[99.82,11.8],[99.55,11.2],[99.25,10.5],[99.15,9.95],[99.25,9.4],[99.35,9.15],[99.85,9.25],[100.05,8.4],[100.35,7.75],[100.45,7.5],[99.55,7.5],[99.1,7.8],[98.9,8.05],[98.75,8.0],[98.6,8.3],[98.45,8.25],[98.3,8.2],[98.27,8.65],[98.32,9.2],[98.5,9.7],[98.62,10.0],[98.55,10.8],[98.6,11.5],[98.6,12.4],[98.4,13.2]];
 const PHUKET=[[98.28,8.2],[98.4,8.15],[98.42,7.9],[98.35,7.75],[98.28,7.8],[98.27,8.0]];
 const poly=p=>p.map(([lo,la])=>X(lo).toFixed(1)+","+Y(la).toFixed(1)).join(" ");
+const VB0={x:-24,y:0,w:394,h:670};let VB={...VB0};
+// Label binnen de kaart houden: kies links of rechts afhankelijk van de ruimte
+let meetCtx=null;
+function tekstBreedte(t,grootte){
+  try{if(!meetCtx)meetCtx=document.createElement("canvas").getContext("2d");meetCtx.font=`700 ${grootte}px "Nunito Sans", "Segoe UI", system-ui, sans-serif`;return meetCtx.measureText(String(t)).width+2}
+  catch(e){return String(t).length*grootte*0.58}
+}
+function labelSide(x,naam,voorkeurLinks,afstand,grootte){
+  const breed=tekstBreedte(naam,grootte);
+  let links=!!voorkeurLinks;
+  if(!links&&x+afstand+breed>VB0.x+VB0.w)links=true;
+  else if(links&&x-afstand-breed<VB0.x)links=false;
+  return {x:links?x-afstand:x+afstand,anchor:links?"end":"start"};
+}
 let TRIPS=[],SEL=null;
-// Alle klikbare uitstapjes (punten met een beschrijving), op datum gesorteerd en genummerd
 function uitstapjes(){
   const alle=[...(KAART.tussenstops||[]).map((p,i)=>({...p,soort:"stop",i})),...(KAART.dagtrips||[]).map((p,i)=>({...p,soort:"trip",i:100+i}))].filter(p=>p.tekst);
   alle.sort((a,b)=>(a.dag||"9")<(b.dag||"9")?-1:(a.dag||"9")>(b.dag||"9")?1:a.i-b.i);
   return alle.map((p,i)=>({...p,nr:i+1}));
 }
-const MND=["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
-function dagLabel(iso){if(!iso)return"";const d=new Date(iso+"T12:00:00"),i=DAYS.findIndex(x=>x.iso===iso);return `${i>=0?"Dag "+(i+1)+" · ":""}${["zo","ma","di","wo","do","vr","za"][d.getDay()]} ${d.getDate()} ${MND[d.getMonth()]}`}
+function dagLabel(iso){if(!iso)return"";const i=DAYS.findIndex(x=>x.iso===iso);return `${i>=0?"Dag "+(i+1)+" · ":""}${dagNaam(iso)}`}
 function drawTrips(){
   const ol=document.getElementById("trips");if(!ol)return;
-  ol.innerHTML=TRIPS.length?TRIPS.map(t=>`<li><button type="button" data-nr="${t.nr}" aria-pressed="${SEL===t.nr}"><span class="nr${t.soort==="stop"?" stop":""}">${t.nr}</span><span class="d">${esc(dagLabel(t.dag).replace(/^Dag \d+ · /,""))}</span><span>${esc(t.naam)}</span></button></li>`).join(""):'<li class="note">Nog geen uitstapjes.</li>';
-  ol.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{kiesUitstapje(Number(b.dataset.nr));document.getElementById("map").scrollIntoView({behavior:"smooth",block:"start"})}));
+  ol.innerHTML=TRIPS.length?TRIPS.map(t=>`<li><button type="button" data-nr="${t.nr}" aria-pressed="${SEL===t.nr}"><span class="nr${t.soort==="stop"?" stop":""}">${t.nr}</span><span class="d">${esc(t.dag?dagNaam(t.dag):"")}</span><span>${esc(t.naam)}</span></button></li>`).join(""):'<li class="note">Nog geen uitstapjes.</li>';
+  ol.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{kiesUitstapje(Number(b.dataset.nr));document.getElementById("map-box").scrollIntoView({behavior:"smooth",block:"start"})}));
   const box=document.getElementById("kaart-info");if(!box)return;
   const t=TRIPS.find(x=>x.nr===SEL);
   if(!t){box.hidden=true;box.innerHTML="";return}
   const heeftDag=t.dag&&DAYS.some(d=>d.iso===t.dag);
   box.innerHTML=`<span class="chip">${esc(dagLabel(t.dag)||"Onderweg")}</span>${t.soort==="stop"?'<span class="chip">stop onderweg</span>':""}
    <h3>${t.nr}. ${esc(t.naam)}</h3>${t.foto?`<img class="zoom" src="img/${esc(t.foto)}.jpg" alt="${esc(t.naam)}" data-cap="${esc(t.naam)}" loading="lazy" style="width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:10px;margin:4px 0 8px">`:""}<p>${esc(t.tekst)}</p>
-   <div class="links">${heeftDag?`<a href="#" id="naar-dag">Bekijk het dagprogramma →</a>`:""}<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(t.naam+" Thailand")}" target="_blank" rel="noopener">Google Maps ↗</a><a href="#" id="sluit-info">Sluiten</a></div>`;
+   <div class="links">${heeftDag?`<a href="#" id="naar-dag">Dagprogramma →</a>`:""}<a href="${mapsLink(t.naam+" Thailand")}" target="_blank" rel="noopener">Google Maps ↗</a><a href="#" id="sluit-info">Sluiten</a></div>`;
   box.hidden=false;
-  const nd=document.getElementById("naar-dag");if(nd)nd.addEventListener("click",e=>{e.preventDefault();show("dagen");setTimeout(()=>{const el=document.getElementById("d-"+t.dag);if(el)el.scrollIntoView({behavior:"smooth",block:"start"})},50)});
+  const nd=document.getElementById("naar-dag");if(nd)nd.addEventListener("click",e=>{e.preventDefault();openDag(t.dag)});
   document.getElementById("sluit-info").addEventListener("click",e=>{e.preventDefault();SEL=null;drawMap()});
 }
 function kiesUitstapje(nr){SEL=SEL===nr?null:nr;drawMap()}
 function drawMap(){
-  const s=document.getElementById("map"), ns="http://www.w3.org/2000/svg";
-  let h=`<rect width="370" height="670" fill="var(--water)"/>
+  const s=document.getElementById("map");if(!s)return;
+  let h=`<rect x="-400" y="-400" width="1170" height="1470" fill="var(--water)"/>
   <polygon points="${poly(LAND)}" fill="var(--land)" stroke="var(--line)" stroke-width="1"/>
   <polygon points="${poly(PHUKET)}" fill="var(--land)" stroke="var(--line)" stroke-width="1"/>
   <text x="250" y="560" fill="var(--muted)" font-size="12" font-style="italic">Golf van Thailand</text>
-  <text x="18" y="470" fill="var(--muted)" font-size="12" font-style="italic">Andamanzee</text>
+  <text x="14" y="485" fill="var(--muted)" font-size="12" font-style="italic">Andamanzee</text>
   <polyline points="${(KAART.route||[]).map(p=>X(p.lon).toFixed(1)+","+Y(p.lat).toFixed(1)).join(" ")}" fill="none" stroke="var(--sun)" stroke-width="3" stroke-linejoin="round"/>`;
-  // Punten zonder beschrijving: zoals vroeger, met label
-  (KAART.tussenstops||[]).filter(p=>!p.tekst).forEach(p=>{const x=X(p.lon),y=Y(p.lat),l=!!p.links;h+=`<circle cx="${x}" cy="${y}" r="4.5" fill="var(--surface)" stroke="var(--sun)" stroke-width="2"/>
-   <text x="${x+(l?-8:8)}" y="${y+(l?14:4)}" text-anchor="${l?"end":"start"}" font-size="11" fill="var(--fg)">${esc(p.naam)}</text>`});
-  (KAART.dagtrips||[]).filter(p=>!p.tekst).forEach(p=>{const x=X(p.lon),y=Y(p.lat),l=!!p.links;h+=`<path d="M${x},${y-6} L${x+5.5},${y+4} L${x-5.5},${y+4} Z" fill="var(--sea)"/>
-   <text x="${x+(l?-8:8)}" y="${y+4}" text-anchor="${l?"end":"start"}" font-size="11" font-style="italic" fill="var(--sea)">${esc(p.naam)}</text>`});
-  BASES.forEach(b=>{const x=X(Number(b.lon)),y=Y(Number(b.lat)),left=!!b.links;h+=`<g class="pin" data-id="${esc(b.id)}" style="cursor:pointer" tabindex="0" role="button" aria-label="${esc(b.name)}">
+  (KAART.tussenstops||[]).filter(p=>!p.tekst).forEach(p=>{const x=X(p.lon),y=Y(p.lat),L=labelSide(x,p.naam,p.links,8,11);h+=`<circle cx="${x}" cy="${y}" r="4.5" fill="var(--surface)" stroke="var(--sun)" stroke-width="2"/>
+   <text x="${L.x}" y="${y+4}" text-anchor="${L.anchor}" font-size="11" fill="var(--fg)">${esc(p.naam)}</text>`});
+  (KAART.dagtrips||[]).filter(p=>!p.tekst).forEach(p=>{const x=X(p.lon),y=Y(p.lat),L=labelSide(x,p.naam,p.links,8,11);h+=`<path d="M${x},${y-6} L${x+5.5},${y+4} L${x-5.5},${y+4} Z" fill="var(--sea)"/>
+   <text x="${L.x}" y="${y+4}" text-anchor="${L.anchor}" font-size="11" font-style="italic" fill="var(--sea)">${esc(p.naam)}</text>`});
+  BASES.forEach(b=>{const x=X(Number(b.lon)),y=Y(Number(b.lat)),L=labelSide(x,b.name,b.links,16,13);h+=`<g class="pin" data-id="${esc(b.id)}" style="cursor:pointer" tabindex="0" role="button" aria-label="${esc(b.name)}">
+   <circle cx="${x}" cy="${y}" r="18" fill="transparent"/>
    <circle cx="${x}" cy="${y}" r="11" fill="var(--sun)" stroke="var(--surface)" stroke-width="2.5"/>
    <text x="${x}" y="${y+4}" text-anchor="middle" font-size="12" font-weight="800" fill="var(--surface)">${b.n}</text>
-   <text x="${left?x-16:x+16}" y="${y+5}" text-anchor="${left?"end":"start"}" font-size="13" font-weight="700" fill="var(--fg)">${esc(b.name)}</text></g>`});
-  // Uitstapjes met beschrijving: genummerd en klikbaar (bovenop, zodat ze altijd te raken zijn)
+   <text x="${L.x}" y="${y+5}" text-anchor="${L.anchor}" font-size="13" font-weight="700" fill="var(--fg)" stroke="var(--water)" stroke-width="3" paint-order="stroke">${esc(b.name)}</text></g>`});
   TRIPS=uitstapjes();
-  // Punten die over een overnachting of over elkaar vallen een stukje uit elkaar duwen (met een lijntje naar de echte plek)
   const vast=BASES.map(b=>({x:X(Number(b.lon)),y:Y(Number(b.lat)),r:13}));
   const pos=TRIPS.map(t=>({x0:X(Number(t.lon)),y0:Y(Number(t.lat)),x:X(Number(t.lon)),y:Y(Number(t.lat))}));
   for(let it=0;it<60;it++)pos.forEach((p,i)=>{
     const duw=(ox,oy,min)=>{let dx=p.x-ox,dy=p.y-oy,d=Math.hypot(dx,dy);if(d>=min)return;if(d<0.01){const a=i*2.4;dx=Math.cos(a);dy=Math.sin(a);d=1}const k=(min-d)/d*0.5;p.x+=dx*k;p.y+=dy*k};
     vast.forEach(o=>duw(o.x,o.y,o.r+9));pos.forEach((q,j)=>{if(j!==i)duw(q.x,q.y,17)});
   });
-  const volgorde=TRIPS.map((t,i)=>i).sort((a,b)=>(TRIPS[a].nr===SEL)-(TRIPS[b].nr===SEL)); // gekozen punt bovenop
-  volgorde.forEach(i=>{const t=TRIPS[i],{x,y,x0,y0}=pos[i],sel=SEL===t.nr,stop=t.soort==="stop",l=!!t.links;
+  const volgorde=TRIPS.map((t,i)=>i).sort((a,b)=>(TRIPS[a].nr===SEL)-(TRIPS[b].nr===SEL));
+  volgorde.forEach(i=>{const t=TRIPS[i],{x,y,x0,y0}=pos[i],sel=SEL===t.nr,stop=t.soort==="stop";
    const lijn=Math.hypot(x-x0,y-y0)>3?`<line x1="${x0}" y1="${y0}" x2="${x}" y2="${y}" stroke="var(--sea)" stroke-width="1"/><circle cx="${x0}" cy="${y0}" r="2" fill="var(--sea)"/>`:"";
+   const L=labelSide(x,t.naam,t.links,13,12);
    h+=`<g class="trip" data-nr="${t.nr}" style="cursor:pointer" tabindex="0" role="button" aria-label="${esc(t.nr+". "+t.naam)}">${lijn}
-    <circle cx="${x}" cy="${y}" r="13" fill="transparent"/>
+    <circle cx="${x}" cy="${y}" r="16" fill="transparent"/>
     <circle cx="${x}" cy="${y}" r="${sel?9:7.5}" fill="${stop?"var(--surface)":"var(--sea)"}" stroke="${sel?"var(--sun)":stop?"var(--sea)":"var(--surface)"}" stroke-width="${sel?3:1.5}"/>
     <text x="${x}" y="${y+3.5}" text-anchor="middle" font-size="9.5" font-weight="800" fill="${stop?"var(--sea)":"var(--surface)"}">${t.nr}</text>
-    ${sel?`<text x="${x+(l||x>250?-13:13)}" y="${y+4}" text-anchor="${l||x>250?"end":"start"}" font-size="12" font-weight="700" fill="var(--fg)" stroke="var(--water)" stroke-width="3" paint-order="stroke">${esc(t.naam)}</text>`:""}</g>`});
+    ${sel?`<text x="${L.x}" y="${y+4}" text-anchor="${L.anchor}" font-size="12" font-weight="700" fill="var(--fg)" stroke="var(--water)" stroke-width="3" paint-order="stroke">${esc(t.naam)}</text>`:""}</g>`});
   s.innerHTML=h;
-  s.querySelectorAll(".trip").forEach(g=>{const go=()=>kiesUitstapje(Number(g.dataset.nr));
-    g.addEventListener("click",go);g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}})});
+  zetViewBox();
+  s.querySelectorAll(".trip").forEach(g=>{const go=()=>{if(!gesleept)kiesUitstapje(Number(g.dataset.nr))};
+    g.addEventListener("click",go);g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();kiesUitstapje(Number(g.dataset.nr))}})});
   drawTrips();
-  s.querySelectorAll(".pin").forEach(g=>{const go=()=>{show("plekken");setTimeout(()=>document.getElementById("p-"+g.dataset.id).scrollIntoView({behavior:"smooth",block:"start"}),50)};
-    g.addEventListener("click",go);g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}})});
+  s.querySelectorAll(".pin").forEach(g=>{const go=()=>{if(!gesleept)openPlek(g.dataset.id)};
+    g.addEventListener("click",go);g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPlek(g.dataset.id)}})});
 }
+// Zoomen en schuiven: knoppen, twee vingers (knijpen) en slepen als je bent ingezoomd
+function zetViewBox(){
+  const s=document.getElementById("map"),box=document.getElementById("map-box");if(!s)return;
+  VB.w=Math.min(VB0.w,Math.max(VB0.w/5,VB.w));VB.h=VB.w*VB0.h/VB0.w;
+  VB.x=Math.min(VB0.x+VB0.w-VB.w,Math.max(VB0.x,VB.x));VB.y=Math.min(VB0.h-VB.h,Math.max(0,VB.y));
+  s.setAttribute("viewBox",`${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
+  const zoom=VB.w<VB0.w-0.5;if(box)box.classList.toggle("zoomed",zoom);
+  const r=document.getElementById("zoom-reset");if(r)r.hidden=!zoom;
+}
+function zoomOm(f,cx,cy){const nw=Math.min(VB0.w,Math.max(VB0.w/5,VB.w*f));if(cx==null){cx=VB.x+VB.w/2;cy=VB.y+VB.h/2}
+  const k=nw/VB.w;VB.x=cx-(cx-VB.x)*k;VB.y=cy-(cy-VB.y)*k;VB.w=nw;zetViewBox()}
+let gesleept=false;
+(function(){
+  const s=document.getElementById("map");if(!s)return;
+  const pts=new Map();let start=null;
+  const naarKaart=(cx,cy)=>{const r=s.getBoundingClientRect();return{x:VB.x+(cx-r.left)/r.width*VB.w,y:VB.y+(cy-r.top)/r.height*VB.h}};
+  s.addEventListener("pointerdown",e=>{pts.set(e.pointerId,{x:e.clientX,y:e.clientY});gesleept=false;
+    if(pts.size===2){const [a,b]=[...pts.values()];start={d:Math.hypot(a.x-b.x,a.y-b.y),w:VB.w,c:naarKaart((a.x+b.x)/2,(a.y+b.y)/2)}}
+    else start={x:e.clientX,y:e.clientY,vx:VB.x,vy:VB.y}});
+  s.addEventListener("pointermove",e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2&&start&&start.d){const [a,b]=[...pts.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(d>0){const nw=Math.min(VB0.w,Math.max(VB0.w/5,start.w*start.d/d));VB.w=nw;
+      const r=s.getBoundingClientRect(),mx=((a.x+b.x)/2-r.left)/r.width,my=((a.y+b.y)/2-r.top)/r.height;VB.x=start.c.x-mx*nw;VB.y=start.c.y-my*nw*VB0.h/VB0.w;zetViewBox();gesleept=true}}
+    else if(pts.size===1&&start&&start.vx!=null&&VB.w<VB0.w-0.5){const r=s.getBoundingClientRect();const dx=(e.clientX-start.x)/r.width*VB.w,dy=(e.clientY-start.y)/r.height*VB.h;
+      if(Math.hypot(e.clientX-start.x,e.clientY-start.y)>6)gesleept=true;VB.x=start.vx-dx;VB.y=start.vy-dy;zetViewBox()}});
+  const eind=e=>{pts.delete(e.pointerId);if(pts.size<2&&start&&start.d)start=null;setTimeout(()=>{if(!pts.size)gesleept=false},50)};
+  s.addEventListener("pointerup",eind);s.addEventListener("pointercancel",eind);
+  s.addEventListener("wheel",e=>{if(!e.ctrlKey&&!e.metaKey&&VB.w>=VB0.w-0.5&&e.deltaY>0)return;e.preventDefault();const p=naarKaart(e.clientX,e.clientY);zoomOm(e.deltaY<0?0.8:1.25,p.x,p.y)},{passive:false});
+  const zi=document.getElementById("zoom-in"),zu=document.getElementById("zoom-uit"),zr=document.getElementById("zoom-reset");
+  if(zi)zi.addEventListener("click",()=>zoomOm(0.6));if(zu)zu.addEventListener("click",()=>zoomOm(1/0.6));if(zr)zr.addEventListener("click",()=>{VB={...VB0};zetViewBox()});
+})();
 
-const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const WD=["zo","ma","di","wo","do","vr","za"];
-function todayISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+// ---------- Dagen ----------
+let DAGSEL=null;
+function plekVanNacht(iso){
+  const d=Number(iso.slice(8));
+  return BASES.find(b=>{const m=String(b.dates).match(/(\d+)\D+(\d+)/);return m&&d>=Number(m[1])&&d<Number(m[2])});
+}
 function drawDays(){
   const t=todayISO();
-  document.getElementById("days").innerHTML=DAYS.map(({iso,title,drive,items,photo},i)=>{const d=new Date(iso+"T12:00:00");
-   return `<div class="day${iso===t?" today":""}" id="d-${iso}"><div class="date"><div class="w">${WD[d.getDay()]}</div><div class="n">${d.getDate()}</div><div class="w">feb</div></div>
-   <div style="min-width:0"><div><span class="chip">Dag ${i+1}</span>${drive?`<span class="chip drive">${esc(drive)} rijden</span>`:""}</div><h3 style="margin-top:6px">${esc(title)}</h3><ul>${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>${photo?`<img class="thumb zoom" src="img/${esc(photo)}.jpg" alt="${esc(title)}" data-cap="${esc(title)}" loading="lazy">`:""}</div></div>`}).join("");
+  const ds=document.getElementById("datestrip");
+  if(ds)ds.innerHTML=DAYS.map(({iso})=>{const d=new Date(iso+"T12:00:00");return `<button type="button" data-iso="${iso}" class="${iso===t?"today":""}" aria-current="${iso===DAGSEL}"><span>${WD[d.getDay()]}</span><b>${d.getDate()}</b></button>`}).join("");
+  if(ds)ds.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>openDag(b.dataset.iso)));
+  const kop=(iso,i,title,drive)=>{const d=new Date(iso+"T12:00:00");return `<div class="date"><div class="w">${WD[d.getDay()]}</div><div class="n">${d.getDate()}</div><div class="w">feb</div></div>
+   <div class="tt"><div><span class="chip">Dag ${i+1}</span>${drive?`<span class="chip drive">${esc(drive)} rijden</span>`:""}</div><h3>${esc(title)}</h3></div>`};
+  const inhoud=(iso,title,items,photo)=>{const b=plekVanNacht(iso);return `<ul>${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+   ${b?`<p class="note" style="margin:8px 0 0">Vannacht: <b>${esc(b.hotel)}</b>, ${esc(b.name)}</p>`:""}
+   ${photo?`<img class="thumb zoom" src="img/${esc(photo)}.jpg" alt="${esc(title)}" data-cap="${esc(title)}" loading="lazy">`:""}`};
+  const lijst=document.getElementById("days");
+  if(lijst){
+    const open=new Set([...lijst.querySelectorAll("details[open]")].map(d=>d.dataset.iso));
+    if(!lijst.children.length)open.add(DAYS.some(d=>d.iso===t)?t:"");
+    lijst.innerHTML=DAYS.map(({iso,title,drive,items,photo},i)=>`<details class="day${iso===t?" today":""}" id="d-${iso}" data-iso="${iso}" ${open.has(iso)?"open":""}><summary>${kop(iso,i,title,drive)}</summary><div class="body">${inhoud(iso,title,items,photo)}</div></details>`).join("");
+  }
+  const md=document.getElementById("day-md");
+  if(md){
+    if(!DAGSEL||!DAYS.some(d=>d.iso===DAGSEL))DAGSEL=DAYS.some(d=>d.iso===t)?t:(DAYS[0]&&DAYS[0].iso);
+    const i=DAYS.findIndex(d=>d.iso===DAGSEL),D=DAYS[i];
+    md.innerHTML=`<div class="lijst">${DAYS.map(({iso,title},j)=>{const d=new Date(iso+"T12:00:00");return `<button type="button" data-iso="${iso}" class="${iso===t?"today":""}" aria-current="${iso===DAGSEL}"><div class="date"><div class="w">${WD[d.getDay()]}</div><div class="n">${d.getDate()}</div></div><div><div class="note">Dag ${j+1}</div><div class="t">${esc(title)}</div></div></button>`}).join("")}</div>
+     ${D?`<div class="detail"><div><span class="chip">Dag ${i+1} · ${esc(dagNaam(D.iso))}</span>${D.drive?`<span class="chip drive">${esc(D.drive)} rijden</span>`:""}</div><h3>${esc(D.title)}</h3>${inhoud(D.iso,D.title,D.items,D.photo).replace('class="thumb zoom"','class="zoom"')}
+      <div class="nav2">${i>0?`<button type="button" class="ghost" data-iso="${DAYS[i-1].iso}">← ${esc(dagNaam(DAYS[i-1].iso))}</button>`:"<span></span>"}${i<DAYS.length-1?`<button type="button" class="ghost" data-iso="${DAYS[i+1].iso}">${esc(dagNaam(DAYS[i+1].iso))} →</button>`:""}</div></div>`:""}`;
+    md.querySelectorAll("button[data-iso]").forEach(b=>b.addEventListener("click",()=>{DAGSEL=b.dataset.iso;drawDays()}));
+  }
 }
-function drawLegs(){document.getElementById("legs").innerHTML=LEGS.map(([d,r,t])=>`<li><span class="d">${d}</span><span>${r}</span><span class="t">${t}</span></li>`).join("")}
+function openDag(iso){
+  show("dagen");DAGSEL=iso;drawDays();
+  const el=document.getElementById("d-"+iso);
+  if(el&&getComputedStyle(document.getElementById("days")).display!=="none"){el.open=true;setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),30)}
+}
+function drawLegs(){document.getElementById("legs").innerHTML=LEGS.map(([d,r,t])=>`<li><span class="d">${esc(d)}</span><span>${esc(r)}</span><span class="t">${esc(t)}</span></li>`).join("")}
+
+// ---------- Overnachtingen ----------
 function drawPlaces(){
-  document.getElementById("places").innerHTML=BASES.map(b=>`<article class="place" id="p-${b.id}">
-   <div class="band${b.img&&b.img[0]?"":" nofoto"}">${b.img&&b.img[0]?`<img class="zoom" src="img/${esc(b.img[0])}.jpg" alt="${esc(b.img[1])}" data-cap="${esc(b.img[1])}" loading="lazy">`:""}<span class="num">${b.n}</span><span class="when">${b.dates}</span></div>
-   <div class="in"><h3>${esc(b.name)}</h3>
-    <dl class="kv"><dt>Verblijf</dt><dd>${esc(b.nights)}</dd><dt>Prijs</dt><dd>${b.prijs!=null?eur(b.prijs):'<span class="note">nog onbekend</span>'}</dd><dt>Hotel</dt><dd>${b.hotelFoto?`<img class="hotelfoto zoom" src="img/${esc(b.hotelFoto)}.jpg" alt="${esc(b.hotel)}" data-cap="${esc(b.hotel)}" loading="lazy">`:""}<b>${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">${esc(b.hotel)} ↗</a>`:esc(b.hotel)}</b><br>${esc(b.why)}</dd>${b.alt?`<dt>Alternatief</dt><dd>${esc(b.alt)}</dd>`:""}
-    <dt>Doen</dt><dd>${b.todo.map(esc).join(" · ")}</dd></dl>
-    ${b.gal.length?`<div class="strip">${b.gal.map(([f,c])=>`<figure><img class="zoom" src="img/${f}.jpg" alt="${c}" data-cap="${c}" loading="lazy"><figcaption>${c}</figcaption></figure>`).join("")}</div>`:""}
-    <div class="links"><a href="https://unsplash.com/s/photos/${b.q}" target="_blank" rel="noopener">Foto's op Unsplash ↗</a>
-    ${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">Website hotel ↗</a>`:""}
-    <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.g)}" target="_blank" rel="noopener">Hotel op Google Maps ↗</a></div>
-   </div></article>`).join("");
+  const el=document.getElementById("places");if(!el)return;
+  const open=new Set([...el.querySelectorAll("details[open]")].map(d=>d.dataset.id));
+  el.innerHTML=BASES.map(b=>{const foto=b.img&&b.img[0];return `<details class="place" id="p-${esc(b.id)}" data-id="${esc(b.id)}" ${open.has(b.id)?"open":""}>
+   <summary><div class="pthumb">${foto?`<img src="img/${esc(foto)}.jpg" alt="" loading="lazy"><span class="num">${b.n}</span>`:`<span class="num big">${b.n}</span>`}</div>
+    <div class="kop"><h3>${esc(b.name)}</h3><div class="meta">${esc(b.dates)} · ${esc(b.nights)}</div><div class="meta"><b>${esc(b.hotel)}</b>${b.prijs!=null&&b.prijs!==""?` · ${eur(b.prijs)}`:""}</div></div></summary>
+   ${foto?`<div class="band"><img class="zoom" src="img/${esc(foto)}.jpg" alt="${esc(b.img[1])}" data-cap="${esc(b.img[1])}" loading="lazy"><span class="when">${esc(b.dates)}</span></div>`:""}
+   <div class="in">
+    <dl class="kv"><dt>Verblijf</dt><dd>${esc(b.nights)}</dd><dt>Prijs</dt><dd>${b.prijs!=null&&b.prijs!==""?eur(b.prijs):'<span class="note">nog onbekend</span>'}</dd><dt>Hotel</dt><dd>${b.hotelFoto?`<img class="hotelfoto zoom" src="img/${esc(b.hotelFoto)}.jpg" alt="${esc(b.hotel)}" data-cap="${esc(b.hotel)}" loading="lazy">`:""}<b>${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">${esc(b.hotel)} ↗</a>`:esc(b.hotel)}</b><br>${esc(b.why)}</dd>${b.alt?`<dt>Alternatief</dt><dd>${esc(b.alt)}</dd>`:""}
+    <dt>Doen</dt><dd>${(b.todo||[]).map(esc).join(" · ")}</dd></dl>
+    ${(b.gal||[]).length?`<div class="strip">${b.gal.map(([f,c])=>`<figure><img class="zoom" src="img/${esc(f)}.jpg" alt="${esc(c)}" data-cap="${esc(c)}" loading="lazy"><figcaption>${esc(c)}</figcaption></figure>`).join("")}</div>`:""}
+    <div class="links">${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">Boeking / website ↗</a>`:""}<a href="${routeLink(b.g)}" target="_blank" rel="noopener">Route naar hotel ↗</a><a href="${mapsLink(b.g)}" target="_blank" rel="noopener">Google Maps ↗</a><a href="https://unsplash.com/s/photos/${esc(b.q)}" target="_blank" rel="noopener">Foto's ↗</a></div>
+   </div></details>`}).join("");
+}
+function openPlek(id){
+  show("plekken");
+  const el=document.getElementById("p-"+id);if(!el)return;
+  el.open=true;setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),30);
 }
 const eur=n=>new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR"}).format(n);
 const nachtenVan=b=>parseInt(b.nights,10)||0;
+function kostenSom(){
+  const met=BASES.filter(b=>b.prijs!=null&&b.prijs!==""),zonder=BASES.filter(b=>b.prijs==null||b.prijs==="");
+  return {met,zonder,tot:met.reduce((s,b)=>s+Number(b.prijs),0),nachten:BASES.reduce((s,b)=>s+nachtenVan(b),0),nMet:met.reduce((s,b)=>s+nachtenVan(b),0)};
+}
 // Kosten van de accommodaties: wordt bij elke weergave opnieuw berekend uit de gegevens
 function drawKosten(){
-  const met=BASES.filter(b=>b.prijs!=null&&b.prijs!==""),zonder=BASES.filter(b=>b.prijs==null||b.prijs==="");
-  const tot=met.reduce((s,b)=>s+Number(b.prijs),0),nachten=BASES.reduce((s,b)=>s+nachtenVan(b),0);
-  const nMet=met.reduce((s,b)=>s+nachtenVan(b),0),pers=parseInt(infoVal("reizigers","4"),10)||4;
+  const {zonder,tot,nachten,nMet}=kostenSom(),pers=parseInt(infoVal("reizigers","4"),10)||4;
   const bedrag=n=>n==null||n===""?"":Number(n).toLocaleString("nl-NL",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const rijen=BASES.map(b=>`<tr><td><label for="pr-ID-${esc(b.id)}">${esc(b.name)} · ${esc(b.nights)}</label></td><td>${ROLE==="gast"?(b.prijs!=null&&b.prijs!==""?eur(b.prijs):"nog onbekend"):`€ <input class="prijs" id="pr-ID-${esc(b.id)}" data-id="${esc(b.id)}" inputmode="decimal" autocomplete="off" placeholder="onbekend" value="${bedrag(b.prijs)}" aria-label="Prijs ${esc(b.name)} in euro">`}</td></tr>`).join("");
-  const html=BASES.length?`<div class="note">Accommodaties totaal${zonder.length?" (tot nu toe)":""}</div><div class="tot">${eur(tot)}</div>
-   <div class="note">${nachten} nachten${nMet?` · gemiddeld ${eur(tot/nMet)} per nacht`:""} · ${eur(tot/pers)} per persoon (${pers} reizigers)</div>
-   ${zonder.length?`<p class="note" style="margin:6px 0 0">Nog zonder prijs: ${zonder.map(b=>esc(b.name)).join(", ")}</p>`:""}
-   <table class="tbl" style="margin-top:8px">${rijen}<tr class="som"><td>Totaal</td><td>${eur(tot)}</td></tr></table>
-   ${ROLE==="gast"?"":`<p class="note kosten-msg" aria-live="polite" style="margin:6px 0 0">Pas een bedrag aan en druk op Enter; het totaal rekent vanzelf opnieuw.</p>`}`:"";
-  ["kosten-plekken","kosten-check"].forEach(id=>{const el=document.getElementById(id);if(!el)return;
+  const rijen=BASES.map(b=>`<tr><td><label for="pr-${esc(b.id)}">${esc(b.name)} · ${esc(b.nights)}</label></td><td>${ROLE==="gast"?(b.prijs!=null&&b.prijs!==""?eur(b.prijs):"nog onbekend"):`€ <input class="prijs" id="pr-${esc(b.id)}" data-id="${esc(b.id)}" inputmode="decimal" autocomplete="off" placeholder="onbekend" value="${bedrag(b.prijs)}" aria-label="Prijs ${esc(b.name)} in euro">`}</td></tr>`).join("");
+  const el=document.getElementById("kosten-plekken");
+  if(el){
     const actief=document.activeElement&&el.contains(document.activeElement)&&document.activeElement.classList.contains("prijs");
-    if(actief)return; // niet opnieuw tekenen terwijl iemand typt
-    el.innerHTML=html.replace(/pr-ID-/g,"pr-"+id+"-");
-    el.querySelectorAll("input.prijs").forEach(inp=>{
-      inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();inp.blur()}});
-      inp.addEventListener("change",()=>prijsWijzigen(inp,el.querySelector(".kosten-msg")));
-    });
-  });
+    if(!actief){
+      const wasOpen=!!el.querySelector("details[open]");
+      el.innerHTML=BASES.length?`<details ${wasOpen?"open":""}><summary><div><div class="note">Accommodaties totaal${zonder.length?" (tot nu toe)":""}</div><div class="tot">${eur(tot)}</div>
+       <div class="note">${nachten} nachten${nMet?` · gemiddeld ${eur(tot/nMet)} per nacht`:""} · ${eur(tot/pers)} per persoon (${pers} reizigers)</div></div><span class="open-txt">${ROLE==="gast"?"Per hotel":"Bedragen"}</span></summary>
+       ${zonder.length?`<p class="note" style="margin:6px 0 0">Nog zonder prijs: ${zonder.map(b=>esc(b.name)).join(", ")}</p>`:""}
+       <table class="tbl" style="margin-top:8px">${rijen}<tr class="som"><td>Totaal</td><td>${eur(tot)}</td></tr></table>
+       ${ROLE==="gast"?"":`<p class="note kosten-msg" aria-live="polite" style="margin:6px 0 0">Pas een bedrag aan en druk op Enter; het totaal rekent vanzelf opnieuw.</p>`}</details>`:"";
+      el.querySelectorAll("input.prijs").forEach(inp=>{
+        inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();inp.blur()}});
+        inp.addEventListener("change",()=>prijsWijzigen(inp,el.querySelector(".kosten-msg")));
+      });
+    }
+  }
+  const sum=document.getElementById("kosten-sum");
+  if(sum)sum.innerHTML=`<div><div class="note">Accommodaties${zonder.length?" (tot nu toe)":""}</div><b>${eur(tot)}</b></div><a href="#" data-goto="plekken" data-open-kosten="1">Per hotel →</a>`;
 }
 function leesBedrag(v){const t=String(v).replace(/[€\s]/g,"");if(!t)return null;const n=Number(t.includes(",")?t.replace(/\./g,"").replace(",","."):t);return Number.isFinite(n)&&n>=0&&n<=100000?Math.round(n*100)/100:NaN}
 async function prijsWijzigen(inp,msg){
@@ -376,22 +613,36 @@ async function prijsWijzigen(inp,msg){
   try{await savePrice(b,n);zeg("Opgeslagen. Ook de beschrijving en de reservering zijn bijgewerkt.")}
   catch(e){zeg(e&&e.message?e.message:"Opslaan mislukt. Probeer het opnieuw.",true)}
 }
+
+// ---------- Regelen ----------
+const GROEPEN=[["hotels","Hotels"],["vervoer","Vervoer"],["activiteiten","Activiteiten"],["vertrek","Voor vertrek"],["overig","Overig"]];
+function dagenTot(iso){return Math.round((new Date(iso+"T12:00:00")-new Date(todayISO()+"T12:00:00"))/864e5)}
+function deadlineChip(c){
+  if(!c.deadline)return"";
+  const n=dagenTot(c.deadline),lab=c.deadlineLabel||("Uiterlijk "+dagNaam(c.deadline));
+  const warn=!c.done&&n<=14;
+  return `<span class="chip${warn?" warn":""}">${esc(lab)}${!c.done&&n<0?" · verlopen":warn?` · nog ${n} ${n===1?"dag":"dagen"}`:""}</span>`;
+}
 function drawCheck(){
-  document.getElementById("checklist").innerHTML=CHECK.map(c=>`<li><label for="c-${esc(c.id)}"><input type="checkbox" id="c-${esc(c.id)}" data-id="${esc(c.id)}" ${c.done?"checked":""} ${ROLE==="gast"?"disabled":""}>
-   <span class="${c.done?"done":""}">${esc(c.title)}${c.note?`<small>${esc(c.note)}</small>`:""}</span></label></li>`).join("");
+  const el=document.getElementById("checklist");if(!el)return;
+  const groep=c=>GROEPEN.some(g=>g[0]===c.groep)?c.groep:"overig";
+  const sorteer=(a,b)=>(a.done-b.done)||((a.deadline||"9")<(b.deadline||"9")?-1:(a.deadline||"9")>(b.deadline||"9")?1:(a.sort||0)-(b.sort||0));
+  el.innerHTML=GROEPEN.map(([g,naam])=>{const items=CHECK.filter(c=>groep(c)===g).sort(sorteer);if(!items.length)return"";const klaar=items.filter(c=>c.done).length;
+    return `<div class="groep"><h3>${naam}<span>${klaar} van ${items.length}</span></h3><ul class="check">${items.map(c=>`<li><label for="c-${esc(c.id)}"><input type="checkbox" id="c-${esc(c.id)}" data-id="${esc(c.id)}" ${c.done?"checked":""} ${ROLE==="gast"?"disabled":""}>
+     <span class="tekst ${c.done?"done":""}"><span class="titel">${esc(c.title)}</span>${c.note?`<small>${esc(c.note)}</small>`:""}${deadlineChip(c)}</span></label></li>`).join("")}</ul></div>`}).join("");
   const n=CHECK.filter(c=>c.done).length;
   document.getElementById("bar").style.width=(CHECK.length?n/CHECK.length*100:0)+"%";
   document.getElementById("progtxt").textContent=`${n} van ${CHECK.length} geregeld`;
-  document.querySelectorAll("#checklist input").forEach(i=>i.addEventListener("change",()=>toggle(i.dataset.id,i.checked)));
+  el.querySelectorAll("input").forEach(i=>i.addEventListener("change",()=>toggle(i.dataset.id,i.checked)));
 }
 async function toggle(id,done){
   const item=CHECK.find(c=>c.id===id);if(!item)return;
-  const before=item.done;item.done=done;drawCheck();setSync("Opslaan…");
+  const before=item.done;item.done=done;drawCheck();drawVandaag();setSync("Opslaan…");
   try{
     const r=await fetch("api/checklist/"+encodeURIComponent(id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({done})});
     if(!r.ok)throw new Error(r.status);
     setSync("Opgeslagen");
-  }catch(e){item.done=before;drawCheck();setSync("Opslaan mislukt. Controleer je internetverbinding en probeer het opnieuw.",true)}
+  }catch(e){item.done=before;drawCheck();drawVandaag();setSync("Opslaan mislukt. Controleer je internetverbinding en probeer het opnieuw.",true)}
 }
 async function savePrice(b,prijs){
   const r=await fetch("api/bases/"+encodeURIComponent(b.id)+"/prijs",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({prijs})});
@@ -401,13 +652,39 @@ async function savePrice(b,prijs){
   if(aiEnabled)loadHistory();
 }
 function setSync(t,err){const el=document.getElementById("sync");el.textContent=t;el.style.color=err?"var(--sun)":"var(--muted)"}
+
+// ---------- Vandaag ----------
+function drawVandaag(){
+  const el=document.getElementById("vandaag");if(!el)return;
+  const t=todayISO(),i=DAYS.findIndex(d=>d.iso===t);
+  if(i>=0){
+    const D=DAYS[i],b=plekVanNacht(t),M=DAYS[i+1];
+    el.innerHTML=`<div class="vandaag"><div class="rij"><span class="chip">Vandaag · Dag ${i+1} · ${esc(dagNaam(t))}</span>${D.drive?`<span class="chip drive">${esc(D.drive)} rijden</span>`:""}</div>
+     <h3>${esc(D.title)}</h3><ul>${D.items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+     ${b?`<div class="rij"><span class="note">Vannacht: <b>${esc(b.hotel)}</b></span></div><div class="links"><a href="${routeLink(b.g)}" target="_blank" rel="noopener">Route naar het hotel ↗</a>${b.hotelUrl?`<a href="${esc(b.hotelUrl)}" target="_blank" rel="noopener">Boeking ↗</a>`:""}</div>`:""}
+     ${M?`<div class="note">Morgen: ${esc(M.title)}${M.drive?` (${esc(M.drive)} rijden)`:""}</div>`:""}</div>`;
+    return;
+  }
+  const start=DAYS[0]&&DAYS[0].iso;
+  if(start&&t<start&&CHECK.length){
+    const open=CHECK.filter(c=>!c.done).sort((a,b)=>((a.deadline||"9")<(b.deadline||"9")?-1:(a.deadline||"9")>(b.deadline||"9")?1:(a.sort||0)-(b.sort||0)));
+    if(!open.length){el.innerHTML=`<div class="vandaag" style="border-left-color:var(--sea)"><h3>Alles geregeld</h3><div class="note">Alle ${CHECK.length} reserveringen zijn afgevinkt.</div></div>`;return}
+    el.innerHTML=`<div class="vandaag"><div class="rij"><span class="chip">Voorbereiding</span></div><h3>Nog te regelen: ${open.length} van ${CHECK.length}</h3>
+     <ul>${open.slice(0,3).map(c=>`<li>${esc(c.title)}${c.deadline?` <span class="note">· ${esc(c.deadlineLabel||dagNaam(c.deadline))}</span>`:""}</li>`).join("")}</ul>
+     <div><button type="button" class="ghost" data-goto="check">Alles bekijken →</button></div></div>`;
+    return;
+  }
+  el.innerHTML="";
+}
+
+// ---------- Info en kop ----------
 const infoRow=id=>INFO.find(r=>r.id===id)||{};
 const infoVal=(id,def)=>infoRow(id).waarde||def;
 function drawCount(){
   const start=new Date(infoVal("reis_start","2027-02-03T06:35:00+07:00")),end=new Date(infoVal("reis_einde","2027-02-17T08:45:00+07:00")),now=new Date();
   const dagen=esc(infoVal("reisdagen","15")),km=infoVal("afstand","");
   const el=document.getElementById("count");
-  if(now<start){const d=Math.ceil((start-now)/864e5);el.innerHTML=`<div><b>${d}</b> <span>dagen tot vertrek</span></div><div><b>${dagen}</b> <span>dagen</span></div><div><b>${BASES.length||"–"}</b> <span>overnachtingsplekken</span></div>${km?`<div><b>${esc(km)}</b> <span>km</span></div>`:""}`}
+  if(now<start){const d=Math.ceil((start-now)/864e5);el.innerHTML=`<div><b>${d}</b> <span>dagen tot vertrek</span></div><div><b>${dagen}</b> <span>dagen</span></div><div><b>${BASES.length||"–"}</b> <span>plekken</span></div>${km?`<div><b>${esc(km)}</b> <span>km</span></div>`:""}`}
   else if(now<end){const d=Math.floor((now-start)/864e5)+1;el.innerHTML=`<div><b>Dag ${d}</b> <span>van ${dagen}</span></div>`}
   else el.innerHTML=`<div><b>Thuis</b> <span>hopelijk met mooie herinneringen</span></div>`;
 }
@@ -422,17 +699,24 @@ function drawInfo(){
   document.getElementById("info-vlucht").innerHTML=of("vlucht").map(r=>`<div class="fl"><div class="lab">${esc(r.label)}</div><div class="big">${esc(r.waarde)}</div>${br(r.tekst)}</div>`).join("");
   const tbl=(id,rows,cell)=>{document.getElementById(id).innerHTML=rows.map(r=>`<tr><td>${esc(r.label)}</td><td>${cell(r)}</td></tr>`).join("")};
   tbl("info-praktisch",of("praktisch"),r=>br(r.tekst||r.waarde));
-  tbl("info-nood",of("nood"),r=>`<b>${esc(r.waarde)}</b>${r.tekst?` (${esc(r.tekst)})`:""}`);
+  tbl("info-nood",of("nood"),r=>`<b><a href="tel:${esc(r.waarde)}" style="color:inherit">${esc(r.waarde)}</a></b>${r.tekst?` (${esc(r.tekst)})`:""}`);
   tbl("info-woorden",of("woorden"),r=>esc(r.tekst||r.waarde));
   set("info-fotos",infoRow("fotos").tekst||"");
 }
-function show(tab){
-  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===tab?"true":"false"));
+
+// ---------- Navigatie ----------
+function show(tab,{scroll=true}={}){
+  const vorige=document.body.dataset.tab;
+  document.querySelectorAll("nav.tabs button,nav.bnav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===tab?"true":"false"));
   document.querySelectorAll("section[role=tabpanel]").forEach(s=>s.hidden=s.id!==tab);
+  document.body.dataset.tab=tab;
   try{localStorage.setItem("thai27-tab",tab)}catch(e){}
-  if(tab==="dagen"){const el=document.getElementById("d-"+todayISO());if(el)setTimeout(()=>el.scrollIntoView({block:"center"}),50)}
+  if(scroll&&vorige!==tab){const n=document.querySelector("nav.tabs");const top=n&&getComputedStyle(n).display!=="none"?Math.min(window.scrollY,n.offsetTop):0;window.scrollTo({top})}
 }
-document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>show(b.dataset.tab)));
+document.querySelectorAll("nav.tabs button,nav.bnav button").forEach(b=>b.addEventListener("click",()=>show(b.dataset.tab)));
+document.addEventListener("click",e=>{const g=e.target.closest&&e.target.closest("[data-goto]");if(g){e.preventDefault();show(g.dataset.goto);if(g.dataset.openKosten){const d=document.querySelector("#kosten-plekken details");if(d)d.open=true}}});
+const ao=document.getElementById("alles-open");
+if(ao)ao.addEventListener("click",()=>{const ds=[...document.querySelectorAll("#days details")];const open=!ds.every(d=>d.open);ds.forEach(d=>d.open=open);ao.textContent=open?"Alles dichtklappen":"Alles openklappen"});
 const lb=document.createElement("div");lb.id="lb";lb.hidden=true;lb.setAttribute("role","dialog");lb.setAttribute("aria-label","Foto");
 lb.innerHTML='<img alt=""><p></p><button type="button">Sluiten</button>';document.body.appendChild(lb);
 const closeLb=()=>{lb.hidden=true};lb.addEventListener("click",closeLb);document.addEventListener("keydown",e=>{if(e.key==="Escape")closeLb()});
@@ -449,18 +733,19 @@ const rolKlaar=fetch("api/me",{cache:"no-store"}).then(r=>r.json()).then(d=>{ROL
   const tb=document.getElementById("topbar"),rc=document.getElementById("rol-chip");
   if(tb&&rc){rc.textContent=ROLE==="gast"?"Gast":"Beheerder";tb.hidden=false}
   if(ri)ri.textContent=ROLE==="gast"?"Je bent ingelogd als gast: je kunt alles bekijken, maar niets aanpassen. Log uit en log in met het beheerderswachtwoord om iets te wijzigen.":"Je bent ingelogd als beheerder.";
+  const na=document.getElementById("naar-aanpassen");if(na)na.hidden=ROLE==="gast";
   if(ROLE==="gast"){
     const t=document.getElementById("t-edit");if(t)t.hidden=true;
     const sy=document.getElementById("sync");if(sy)sy.textContent="Je bekijkt de app als gast; afvinken kan alleen de beheerder.";
     if(document.getElementById("edit")&&!document.getElementById("edit").hidden)show("route");
   }
 });
-function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawCheck();drawKosten();drawInfo();drawCount()}
+function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawCheck();drawKosten();drawInfo();drawCount();drawVandaag()}
 const h=(location.hash||"").slice(1);
 let startTab="route";try{startTab=localStorage.getItem("thai27-tab")||"route"}catch(e){}
 if(["route","dagen","plekken","check","info","edit"].includes(h))startTab=h;
-show(startTab);drawCount();
-Promise.all([loadTrip(),rolKlaar]).then(()=>{if(ROLE==="gast"&&startTab==="edit")startTab="route";renderAll();show(startTab)}).catch(()=>{
+show(startTab,{scroll:false});drawCount();
+Promise.all([loadTrip(),rolKlaar]).then(()=>{if(ROLE==="gast"&&startTab==="edit")startTab="route";renderAll();show(startTab,{scroll:false})}).catch(()=>{
   document.getElementById("legs").innerHTML='<li><span></span><span>De reisgegevens konden niet worden geladen. Ververs de pagina om het opnieuw te proberen.</span><span></span></li>';
 });
 // ---------- Aanpassen via prompts ----------
@@ -562,6 +847,12 @@ async function checkVersie(){
 checkVersie();
 setInterval(checkVersie,30000);
 document.addEventListener("visibilitychange",checkVersie);
+
+// ---------- Offline ----------
+// De service worker bewaart de app, de reisgegevens en de foto's, zodat de app ook zonder bereik opent.
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+function offlineMelding(){const el=document.getElementById("offline");if(el)el.hidden=navigator.onLine}
+window.addEventListener("online",()=>{offlineMelding();checkVersie()});window.addEventListener("offline",offlineMelding);offlineMelding();
 </script>
 </body>
 </html>

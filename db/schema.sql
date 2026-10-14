@@ -61,7 +61,10 @@ create table if not exists checklist (
   title       text not null,
   note        text,
   done        boolean not null default false,
-  updated_at  timestamptz not null default now()
+  updated_at  timestamptz not null default now(),
+  groep       text,
+  deadline    date,
+  deadline_label text
 );
 
 -- Voorstellen uit het tabblad Aanpassen (ook als ze nog niet zijn toegepast)

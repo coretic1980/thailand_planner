@@ -26,7 +26,7 @@ const ENTITIES = {
   },
   reservering: {
     table: "checklist", key: "id", label: "Reservering",
-    fields: { title: "text", note: "textnull", done: "bool" },
+    fields: { title: "text", note: "textnull", done: "bool", groep: "groep", deadline: "datum", deadline_label: "textnull" },
   },
   info: {
     table: "info", key: "id", label: "Info",
@@ -41,7 +41,7 @@ const FIELD_LABELS = {
   nights: "nachten", hotel: "hotel", alternative: "alternatief", why: "beschrijving", todo: "activiteiten",
   date_label: "datum", route: "route", duration: "duur", note: "toelichting", done: "geregeld",
   lat: "breedtegraad", lon: "lengtegraad", links: "label links", tussenstops: "tussenstops", dagtrips: "dagtrips",
-  hotel_url: "link hotel", hotel_foto: "foto hotel", prijs: "prijs (€)", sectie: "sectie", label: "onderwerp", waarde: "waarde", tekst: "tekst",
+  hotel_url: "link hotel", hotel_foto: "foto hotel", prijs: "prijs (€)", groep: "groep", deadline: "uiterste datum", deadline_label: "wat er dan moet", sectie: "sectie", label: "onderwerp", waarde: "waarde", tekst: "tekst",
 };
 // Het gebied dat de kaart toont (Zuid-Thailand)
 const BOUNDS = { latMin: 7.5, latMax: 14.2, lonMin: 97.5, lonMax: 101.2 };
@@ -82,6 +82,14 @@ function cleanValue(type, v) {
       if (typeof n !== "number" || !Number.isFinite(n) || n < 0 || n > 100000) throw new UserError("Ongeldig bedrag. Gebruik bijvoorbeeld 298,20.");
       return Math.round(n * 100) / 100;
     }
+    case "groep":
+      if (v === null || v === "") return null;
+      if (!["hotels", "vervoer", "activiteiten", "vertrek"].includes(v)) throw new UserError(`Onbekende groep: ${v}`);
+      return v;
+    case "datum":
+      if (v === null || v === "") return null;
+      if (typeof v !== "string" || !/^20\d\d-\d\d-\d\d$/.test(v)) throw new UserError("Een datum noteer je als 2027-01-31.");
+      return v;
     case "sectie":
       if (!INFO_SECTIES.includes(v)) throw new UserError(`Onbekende sectie: ${v}`);
       return v;
@@ -181,7 +189,7 @@ async function snapshot() {
     dagen: await q("select to_char(day_date,'YYYY-MM-DD') as sleutel, title, drive, items, photo from days order by day_date"),
     overnachtingen: await q("select id as sleutel, name, dates, nights, hotel, alternative, why, todo, lat::float as lat, lon::float as lon, links, hotel_url, hotel_foto, prijs::float as prijs from bases order by nr"),
     ritten: await q("select sort::text as sleutel, date_label, route, duration from legs order by sort"),
-    reserveringen: await q("select id as sleutel, title, note, done from checklist order by sort"),
+    reserveringen: await q("select id as sleutel, title, note, done, groep, to_char(deadline,'YYYY-MM-DD') as deadline, deadline_label from checklist order by sort"),
     kaart: (await q("select id as sleutel, route, tussenstops, dagtrips from kaart"))[0] || null,
     info: await q("select id as sleutel, sectie, label, waarde, tekst from info order by sectie, sort, id"),
   };
@@ -251,7 +259,7 @@ De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulp
 
 Regels:
 - Gebruik alleen de sleutels uit de huidige gegevens hieronder.
-- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done), info (label, waarde, tekst).
+- Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done, groep, deadline, deadline_label), info (label, waarde, tekst).
 - Toevoegen en verwijderen kan alleen bij reserveringen en info. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
 - Info is de rest van de app: de kop van de pagina en de teller (sectie "algemeen": hero_label, hero_titel, hero_tekst, hero_foto met het onderschrift in tekst, reis_start, reis_einde, reisdagen, afstand, en de fotocredits in "fotos"), de vluchten (sectie "vlucht": label, waarde = tijd, tekst = regels gescheiden door \\n), praktische info (sectie "praktisch": label en tekst), noodnummers (sectie "nood": label, waarde = nummer, tekst = opmerking) en Thaise woorden (sectie "woorden": label = Nederlands, tekst = Thais). Een nieuwe info-regel geeft je met actie "toevoegen", sleutel null en velden sectie (vlucht, praktisch, nood of woorden), label en tekst of waarde. Regels in de sectie "algemeen" kun je wijzigen, niet toevoegen of verwijderen.
 - De kaart: "route" is de rode lijn, in reisvolgorde, van vliegveld tot vliegveld, inclusief de overnachtingsplekken. "tussenstops" zijn plekken op de route waar je niet slaapt, "dagtrips" zijn uitstapjes vanaf een overnachting. Elk punt is {"naam","lat","lon"} met optioneel "links": true als het label links van de pin moet (bijvoorbeeld als het rechts tegen een ander label aan zou staan). Tussenstops en dagtrips kunnen ook "dag" (de datum, bijvoorbeeld "2027-02-05"), "tekst" (één of twee zinnen) en "foto" (uit de lijst met foto's) hebben; dan staan ze als klikbaar uitstapje op de kaart. Lijsten geef je altijd compleet terug, met alle velden van de punten die blijven staan.
@@ -262,6 +270,7 @@ Regels:
 - Foto's (photo, hotel_foto en foto bij een kaartpunt): kies alleen uit ${PHOTOS.join(", ")}, of null.
 - hotel_url is de link naar de website of boekingspagina van het hotel (alleen https://). Verandert het hotel, zet hotel_url dan op null tenzij de gebruiker een link geeft; verzin geen links.
 - prijs is het totaalbedrag in euro voor het hele verblijf op die plek (alle kamers en nachten samen), als getal, bijvoorbeeld 298.2. De app telt de prijzen zelf op tot het totaal; zet het totaal dus nergens in een tekst. Verandert het hotel of het aantal nachten en noemt de gebruiker geen nieuwe prijs, zet prijs dan op null. Noemt de gebruiker een prijs, zet die dan in prijs en ook in de beschrijving (why) en de reservering, zoals bij de andere hotels.
+- Reserveringen hebben een groep ("hotels", "vervoer", "activiteiten" of "vertrek") en optioneel een deadline (datum, bijvoorbeeld "2027-01-29") met deadline_label: wat er op die datum moet gebeuren, kort, bijvoorbeeld "Gratis annuleren tot 29 jan" of "Betalen op 24 dec". Geef een nieuwe reservering altijd een groep. Noemt de gebruiker een annulerings- of betaaldatum, zet die dan in deadline en deadline_label.
 - Houd de stijl van de bestaande teksten aan: kort, Nederlands, geen emoji.
 - Als iets in het verzoek niet kan of onduidelijk is, geef dan een lege lijst wijzigingen en leg in de samenvatting uit wat je nodig hebt.
 - Roep altijd het hulpmiddel "voorstel" aan, ook als er niets te wijzigen valt (dan met een lege lijst wijzigingen).
@@ -408,8 +417,8 @@ async function applyChanges(client, prompt, summary, changes) {
         const id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const { rows } = await client.query("select coalesce(max(sort),0)+1 as s from checklist");
         await client.query(
-          "insert into checklist (id, sort, title, note, done) values ($1,$2,$3,$4,coalesce($5,false))",
-          [id, rows[0].s, c.velden.title, c.velden.note ?? null, c.velden.done ?? null]
+          "insert into checklist (id, sort, title, note, done, groep, deadline, deadline_label) values ($1,$2,$3,$4,coalesce($5,false),$6,$7,$8)",
+          [id, rows[0].s, c.velden.title, c.velden.note ?? null, c.velden.done ?? null, c.velden.groep ?? null, c.velden.deadline ?? null, c.velden.deadline_label ?? null]
         );
         log.push({ table: ent.table, key: ent.key, keyValue: id, before: null });
         continue;

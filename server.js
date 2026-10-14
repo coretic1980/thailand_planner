@@ -119,7 +119,7 @@ app.get("/api/trip", async (_req, res, next) => {
       db.query("select * from bases order by nr"),
       db.query("select to_char(day_date,'YYYY-MM-DD') as iso, * from days order by day_date"),
       db.query("select * from legs order by sort"),
-      db.query("select * from checklist order by sort"),
+      db.query("select *, to_char(deadline,'YYYY-MM-DD') as deadline_iso from checklist order by sort"),
       db.query("select route, tussenstops, dagtrips from kaart where id = 'kaart'"),
       db.query("select id, sectie, label, waarde, tekst from info order by sectie, sort, id"),
     ]);
@@ -141,7 +141,7 @@ app.get("/api/trip", async (_req, res, next) => {
       legs: legs.rows.map((l) => [l.date_label, l.route, l.duration]),
       checklist: check.rows.map((c) => ({
         id: c.id, title: c.title, note: c.note, done: c.done,
-        updatedAt: c.updated_at,
+        updatedAt: c.updated_at, groep: c.groep || null, deadline: c.deadline_iso || null, deadlineLabel: c.deadline_label || null,
       })),
       info: info.rows,
     });
@@ -214,7 +214,11 @@ app.post("/api/assistant/undo", requireAdmin, requireAssistant, handle(() => ass
 // Versie van de gegevens: de app vraagt dit elke 30 seconden op en ververst als het verandert
 app.get("/api/versie", handle(async () => ({ versie: await assistant.dataVersion() })));
 
-app.use(express.static(path.join(__dirname, "public"), { maxAge: "7d", index: "index.html" }));
+// Foto's mogen lang in de cache; de pagina en de service worker niet, zodat een nieuwe versie meteen zichtbaar is
+app.use(express.static(path.join(__dirname, "public"), {
+  maxAge: "7d", index: "index.html",
+  setHeaders: (res, file) => { if (/\.(html|js)$/.test(file)) res.setHeader("Cache-Control", "no-cache"); },
+}));
 
 app.use((err, _req, res, _next) => {
   console.error(err);
