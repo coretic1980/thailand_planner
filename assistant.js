@@ -2,6 +2,25 @@
 // de server past het toe in Neon en houdt een log bij zodat je kunt terugdraaien.
 
 const db = require("./db");
+const { AsyncLocalStorage } = require("async_hooks");
+
+// De reis waar het huidige verzoek over gaat. De server zet die met metReis(reis, fn);
+// alle functies hieronder lezen en schrijven alleen gegevens van die reis.
+const reisOpslag = new AsyncLocalStorage();
+const metReis = (reis, fn) => reisOpslag.run(reis, fn);
+function R() {
+  const r = reisOpslag.getStore();
+  if (!r) throw new Error("Geen reis gekozen.");
+  return r;
+}
+const MND = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+function periode(r = R()) {
+  const a = new Date(r.start + "T12:00:00Z"), b = new Date(r.einde + "T12:00:00Z");
+  const zelfdeMaand = a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear();
+  return zelfdeMaand
+    ? `${a.getUTCDate()}–${b.getUTCDate()} ${MND[b.getUTCMonth()]} ${b.getUTCFullYear()}`
+    : `${a.getUTCDate()} ${MND[a.getUTCMonth()]}${a.getUTCFullYear() !== b.getUTCFullYear() ? " " + a.getUTCFullYear() : ""} – ${b.getUTCDate()} ${MND[b.getUTCMonth()]} ${b.getUTCFullYear()}`;
+}
 
 const API_KEY = process.env.ANTHROPIC_API_KEY || "";
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
@@ -60,8 +79,8 @@ const FIELD_LABELS = {
   ter_plaatse_tekst: "ter plaatse (uitleg)", borg: "borg", details: "kenmerken", url: "link", notitie: "notitie",
   bedrag: "bedrag (€)", toelichting: "toelichting", geboekt: "geboekt",
 };
-// Het gebied dat de kaart toont (Zuid-Thailand)
-const BOUNDS = { latMin: 7.5, latMax: 14.2, lonMin: 97.5, lonMax: 101.2 };
+// Het gebied dat de kaart van de reis toont
+const bounds = () => { const k = R().kaart || {}; return { latMin: k.latMin, latMax: k.latMax, lonMin: k.lonMin, lonMax: k.lonMax, gebied: k.gebied || R().land || "het gebied van de reis" }; };
 // Beschikbare foto's: alle .jpg-bestanden in public/img (nieuwe foto's tellen vanzelf mee)
 const IMG_DIR = require("path").join(__dirname, "public", "img");
 const listPhotos = () => {
@@ -120,9 +139,10 @@ function cleanValue(type, v) {
     case "lat":
     case "lon": {
       const n = typeof v === "string" ? Number(v) : v;
-      const [min, max] = type === "lat" ? [BOUNDS.latMin, BOUNDS.latMax] : [BOUNDS.lonMin, BOUNDS.lonMax];
+      const B = bounds();
+      const [min, max] = type === "lat" ? [B.latMin, B.latMax] : [B.lonMin, B.lonMax];
       if (typeof n !== "number" || !Number.isFinite(n) || n < min || n > max) {
-        throw new UserError("Deze plek valt buiten de kaart (alleen Zuid-Thailand).");
+        throw new UserError(`Deze plek valt buiten de kaart (alleen ${B.gebied}).`);
       }
       return Math.round(n * 10000) / 10000;
     }
@@ -137,7 +157,9 @@ function cleanValue(type, v) {
         const out = { naam: text(p.naam, 60), lat: cleanValue("lat", p.lat), lon: cleanValue("lon", p.lon) };
         if (p.links === true) out.links = true;
         if (type === "points" && p.dag != null && p.dag !== "") {
-          if (!/^2027-02-(0[3-9]|1[0-7])$/.test(p.dag)) throw new UserError("De dag van een uitstapje moet tussen 2027-02-03 en 2027-02-17 liggen.");
+          if (typeof p.dag !== "string" || !/^\d{4}-\d\d-\d\d$/.test(p.dag) || p.dag < R().start || p.dag > R().einde) {
+            throw new UserError(`De dag van een uitstapje moet tussen ${R().start} en ${R().einde} liggen.`);
+          }
           out.dag = p.dag;
         }
         if (type === "points" && p.tekst != null && p.tekst !== "") out.tekst = text(p.tekst, 250);
@@ -190,8 +212,8 @@ function cleanChange(c) {
     // Een paar vaste waarden moeten in een bepaald formaat
     if (out.sleutel === "hero_foto" && "waarde" in out.velden) out.velden.waarde = cleanValue("photo", out.velden.waarde);
     if (["reis_start", "reis_einde"].includes(out.sleutel) && "waarde" in out.velden
-        && !/^2027-02-\d\dT\d\d:\d\d:00\+07:00$/.test(out.velden.waarde || "")) {
-      throw new UserError("Begin en einde van de reis noteer je als 2027-02-03T06:35:00+07:00.");
+        && !/^\d{4}-\d\d-\d\dT\d\d:\d\d:00[+-]\d\d:\d\d$/.test(out.velden.waarde || "")) {
+      throw new UserError("Begin en einde van de reis noteer je als 2027-02-03T06:35:00+07:00 (lokale tijd met tijdzone).");
     }
   }
   if (!Object.keys(out.velden).length) throw new UserError("Wijziging zonder velden.");
@@ -201,21 +223,21 @@ function cleanChange(c) {
 // ---------- Huidige gegevens ----------
 
 async function getRow(client, ent, key) {
-  const r = await client.query(`select row_to_json(t) as row from ${ent.table} t where ${ent.key}::text = $1`, [key]);
+  const r = await client.query(`select row_to_json(t) as row from ${ent.table} t where ${ent.key}::text = $1 and reis_id = $2`, [key, R().id]);
   return r.rows[0] ? r.rows[0].row : null;
 }
 
 async function snapshot() {
-  const q = (sql) => db.query(sql).then((r) => r.rows);
+  const q = (sql) => db.query(sql, [R().id]).then((r) => r.rows);
   return {
-    dagen: await q("select to_char(day_date,'YYYY-MM-DD') as sleutel, title, drive, items, photo from days order by day_date"),
-    overnachtingen: await q("select id as sleutel, name, dates, nights, hotel, alternative, why, todo, lat::float as lat, lon::float as lon, links, hotel_url, hotel_foto, prijs::float as prijs from bases order by nr"),
-    ritten: await q("select sort::text as sleutel, date_label, route, duration from legs order by sort"),
-    reserveringen: await q("select id as sleutel, title, note, done, groep, to_char(deadline,'YYYY-MM-DD') as deadline, deadline_label from checklist order by sort"),
-    kaart: (await q("select id as sleutel, route, tussenstops, dagtrips from kaart"))[0] || null,
-    info: await q("select id as sleutel, sectie, label, waarde, tekst from info order by sectie, sort, id"),
-    budget: await q("select id as sleutel, label, bedrag::float as bedrag, toelichting, geboekt from budget order by sort, id"),
-    huurautos: await q("select id as sleutel, verhuurder, auto, reservering, status, ophalen, ophalen_plek, inleveren, inleveren_plek, prijs::float as prijs, ter_plaatse::float as ter_plaatse, ter_plaatse_tekst, borg, details, url, notitie from autohuur order by sort, id"),
+    dagen: await q("select to_char(day_date,'YYYY-MM-DD') as sleutel, title, drive, items, photo from days where reis_id = $1 order by day_date"),
+    overnachtingen: await q("select id as sleutel, name, dates, nights, hotel, alternative, why, todo, lat::float as lat, lon::float as lon, links, hotel_url, hotel_foto, prijs::float as prijs from bases where reis_id = $1 order by nr"),
+    ritten: await q("select sort::text as sleutel, date_label, route, duration from legs where reis_id = $1 order by sort"),
+    reserveringen: await q("select id as sleutel, title, note, done, groep, to_char(deadline,'YYYY-MM-DD') as deadline, deadline_label from checklist where reis_id = $1 order by sort"),
+    kaart: (await q("select id as sleutel, route, tussenstops, dagtrips from kaart where reis_id = $1"))[0] || null,
+    info: await q("select id as sleutel, sectie, label, waarde, tekst from info where reis_id = $1 order by sectie, sort, id"),
+    budget: await q("select id as sleutel, label, bedrag::float as bedrag, toelichting, geboekt from budget where reis_id = $1 order by sort, id"),
+    huurautos: await q("select id as sleutel, verhuurder, auto, reservering, status, ophalen, ophalen_plek, inleveren, inleveren_plek, prijs::float as prijs, ter_plaatse::float as ter_plaatse, ter_plaatse_tekst, borg, details, url, notitie from autohuur where reis_id = $1 order by sort, id"),
   };
 }
 
@@ -273,7 +295,7 @@ const TOOL = {
           type: "object",
           properties: {
             actie: { type: "string", enum: ["wijzigen", "toevoegen", "verwijderen"] },
-            soort: { type: "string", enum: ["dag", "overnachting", "rit", "kaart", "reservering", "info"] },
+            soort: { type: "string", enum: ["dag", "overnachting", "rit", "kaart", "reservering", "info", "auto", "budget"] },
             sleutel: { type: ["string", "null"], description: "De 'sleutel' uit de huidige gegevens; null bij toevoegen." },
             velden: { type: "object", description: "Alleen de velden die veranderen, met hun complete nieuwe waarde." },
           },
@@ -286,18 +308,19 @@ const TOOL = {
 };
 
 function systemPrompt(data) {
-  return `Je beheert de gegevens van een reisapp voor een gezinsroadtrip door Thailand (3–17 februari 2027).
+  const B = bounds(), reis = R();
+  return `Je beheert de gegevens van een reisapp voor de reis "${reis.naam}"${reis.land ? " (" + reis.land + ")" : ""}, ${periode()}.
 De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulpmiddel "voorstel" die wijziging voor, plus alles wat nodig is om de rest van de app ermee in overeenstemming te houden.
 
 Regels:
 - Gebruik alleen de sleutels uit de huidige gegevens hieronder.
 - Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done, groep, deadline, deadline_label), info (label, waarde, tekst), budget (label, bedrag, toelichting, geboekt), auto (verhuurder, auto, reservering, status, ophalen, ophalen_plek, inleveren, inleveren_plek, prijs, ter_plaatse, ter_plaatse_tekst, borg, details, url, notitie).
 - Toevoegen en verwijderen kan alleen bij reserveringen, info, de huurauto en het budget. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
-- Info is de rest van de app: de kop van de pagina en de teller (sectie "algemeen": hero_label, hero_titel, hero_tekst, hero_foto met het onderschrift in tekst, reis_start, reis_einde, reisdagen, afstand, en de fotocredits in "fotos"), de vluchten (sectie "vlucht": label, waarde = tijd, tekst = regels gescheiden door \\n), praktische info (sectie "praktisch": label en tekst), noodnummers (sectie "nood": label, waarde = nummer, tekst = opmerking) en Thaise woorden (sectie "woorden": label = Nederlands, tekst = Thais). Een nieuwe info-regel geeft je met actie "toevoegen", sleutel null en velden sectie (vlucht, praktisch, nood of woorden), label en tekst of waarde. Regels in de sectie "algemeen" kun je wijzigen, niet toevoegen of verwijderen.
+- Info is de rest van de app: de kop van de pagina en de teller (sectie "algemeen": hero_label, hero_titel, hero_tekst, hero_foto met het onderschrift in tekst, reis_start, reis_einde, reisdagen, afstand, en de fotocredits in "fotos"), de vluchten (sectie "vlucht": label, waarde = tijd, tekst = regels gescheiden door \\n), praktische info (sectie "praktisch": label en tekst), noodnummers (sectie "nood": label, waarde = nummer, tekst = opmerking) en woorden in de taal van het land (sectie "woorden": label = Nederlands, tekst = de vertaling, eventueel met uitspraak). Een nieuwe info-regel geeft je met actie "toevoegen", sleutel null en velden sectie (vlucht, praktisch, nood of woorden), label en tekst of waarde. Regels in de sectie "algemeen" kun je wijzigen, niet toevoegen of verwijderen.
 - De kaart: "route" is de rode lijn, in reisvolgorde, van vliegveld tot vliegveld, inclusief de overnachtingsplekken. "tussenstops" zijn plekken op de route waar je niet slaapt, "dagtrips" zijn uitstapjes vanaf een overnachting. Elk punt is {"naam","lat","lon"} met optioneel "links": true als het label links van de pin moet (bijvoorbeeld als het rechts tegen een ander label aan zou staan). Tussenstops en dagtrips kunnen ook "dag" (de datum, bijvoorbeeld "2027-02-05"), "tekst" (één of twee zinnen) en "foto" (uit de lijst met foto's) hebben; dan staan ze als klikbaar uitstapje op de kaart. Lijsten geef je altijd compleet terug, met alle velden van de punten die blijven staan.
 - Uitstapjes: wordt een uitstapje buiten de overnachtingsplaats toegevoegd, verplaatst of geschrapt in het dagprogramma, pas dan ook het punt op de kaart aan (dagtrips of tussenstops, met dag en tekst). Activiteiten in de overnachtingsplaats zelf krijgen geen eigen punt.
 - Verandert de route (een andere overnachtingsplek, een extra stop of een omweg), pas dan in één voorstel alles aan wat erbij hoort: de lat/lon van de overnachting, de kaart (route en eventueel tussenstops of dagtrips), de ritten en het dagprogramma.
-- Coördinaten: gebruik de echte ligging van de plek in decimale graden. De kaart toont alleen Zuid-Thailand (breedtegraad ${BOUNDS.latMin}–${BOUNDS.latMax}, lengtegraad ${BOUNDS.lonMin}–${BOUNDS.lonMax}); een plek daarbuiten kan niet, leg dat dan uit.
+- Coördinaten: gebruik de echte ligging van de plek in decimale graden. De kaart toont alleen ${B.gebied} (breedtegraad ${B.latMin}–${B.latMax}, lengtegraad ${B.lonMin}–${B.lonMax}); een plek daarbuiten kan niet, leg dat dan uit.
 - Lijsten (items, todo) geef je altijd compleet terug, inclusief de punten die blijven staan.
 - Foto's (photo, hotel_foto en foto bij een kaartpunt): kies alleen uit ${PHOTOS.join(", ")}, of null.
 - hotel_url is de link naar de website of boekingspagina van het hotel (alleen https://). Verandert het hotel, zet hotel_url dan op null tenzij de gebruiker een link geeft; verzin geen links.
@@ -310,10 +333,11 @@ Regels:
 - Roep altijd het hulpmiddel "voorstel" aan, ook als er niets te wijzigen valt (dan met een lege lijst wijzigingen).
 - Houd de app consistent. Heeft een wijziging gevolgen elders, neem die dan op in hetzelfde voorstel en noem ze in de samenvatting. In het bijzonder:
   - Verandert het hotel of de data van een overnachting, pas dan ook de reservering aan die erover gaat (de titel noemt het hotel of de plaats en de data).
-  - De data van overnachtingen sluiten op elkaar aan: de vertrekdatum van de ene is de aankomstdatum van de volgende. Het aantal nachten klopt met de data. De reis zelf ligt vast op 3–17 februari 2027.
+  - De data van overnachtingen sluiten op elkaar aan: de vertrekdatum van de ene is de aankomstdatum van de volgende. Het aantal nachten klopt met de data. De reis zelf ligt vast op ${periode()} (${reis.start} tot en met ${reis.einde}).
   - Schuift een overnachting op, pas dan ook het dagprogramma aan (de reisdag "Naar …" met rijtijd valt op de aankomstdatum), de ritten (date_label) en de reserveringen met een datum erin.
   - Wordt een activiteit verplaatst, haal hem dan weg bij de oude dag en zet hem bij de nieuwe dag. Staat er een reservering voor, pas daar de datum aan.
-  - De info moet kloppen met de route: de huurauto (ophaal- en inleverdag en -plek), Chinees Nieuwjaar (welke rit op 6 feb valt en of dat hotel geregeld is), de maximale rijtijd in hero_tekst, de vluchten en de afstand. Verandert iets daaraan, pas de info dan mee aan.
+  - De info moet kloppen met de route: het vervoer (zoals de huurauto: ophaal- en inleverdag en -plek), de teksten in de kop (hero_tekst), de vluchten en de afstand. Verandert iets daaraan, pas de info dan mee aan.
+${reis.notities ? reis.notities.split("\n").map((l) => "  " + l).join("\n") + "\n" : ""}
   - Eigen notities van de gebruiker (prijzen, annuleringsvoorwaarden, boekingsnummers) laat je staan, tenzij de gebruiker vraagt ze te veranderen.
 - Verander niets wat niet met het verzoek te maken heeft.
 
@@ -383,10 +407,10 @@ async function propose(prompt, { claude = callClaude } = {}) {
   for (const c of changes) beschrijving.push(await describe(c));
   const samenvatting = String(raw.samenvatting || "").slice(0, 600);
   // Bewaar het voorstel. Een eerder open voorstel wordt vervangen door dit nieuwe.
-  await db.query("update voorstellen set status = 'vervangen', decided_at = now() where status = 'open'");
+  await db.query("update voorstellen set status = 'vervangen', decided_at = now() where status = 'open' and reis_id = $1", [R().id]);
   const r = await db.query(
-    "insert into voorstellen (prompt, samenvatting, wijzigingen, beschrijving, status) values ($1,$2,$3,$4,$5) returning id, created_at",
-    [prompt.trim(), samenvatting, JSON.stringify(changes), JSON.stringify(beschrijving), changes.length ? "open" : "uitleg"]
+    "insert into voorstellen (reis_id, prompt, samenvatting, wijzigingen, beschrijving, status) values ($6,$1,$2,$3,$4,$5) returning id, created_at",
+    [prompt.trim(), samenvatting, JSON.stringify(changes), JSON.stringify(beschrijving), changes.length ? "open" : "uitleg", R().id]
   );
   return { id: r.rows[0].id, status: changes.length ? "open" : "uitleg", samenvatting, wijzigingen: changes, beschrijving, prompt: prompt.trim(), created_at: r.rows[0].created_at };
 }
@@ -394,15 +418,16 @@ async function propose(prompt, { claude = callClaude } = {}) {
 // Het laatste open voorstel (bijvoorbeeld na verversen van de pagina)
 async function openProposal() {
   const r = await db.query(
-    "select id, prompt, samenvatting, wijzigingen, beschrijving, status, created_at from voorstellen where status = 'open' order by id desc limit 1"
+    "select id, prompt, samenvatting, wijzigingen, beschrijving, status, created_at from voorstellen where status = 'open' and reis_id = $1 order by id desc limit 1",
+    [R().id]
   );
   return r.rows[0] || null;
 }
 
 async function cancel(id) {
   const r = await db.query(
-    "update voorstellen set status = 'geannuleerd', decided_at = now() where id = $1 and status = 'open' returning id",
-    [Number(id)]
+    "update voorstellen set status = 'geannuleerd', decided_at = now() where id = $1 and status = 'open' and reis_id = $2 returning id",
+    [Number(id), R().id]
   );
   if (!r.rowCount) throw new UserError("Dit voorstel is al afgehandeld.");
   return { id: r.rows[0].id };
@@ -413,7 +438,7 @@ async function applyProposal(id) {
   const client = await db.pool.connect();
   try {
     await client.query("begin");
-    const r = await client.query("select * from voorstellen where id = $1 for update", [Number(id)]);
+    const r = await client.query("select * from voorstellen where id = $1 and reis_id = $2 for update", [Number(id), R().id]);
     const v = r.rows[0];
     if (!v) throw new UserError("Dit voorstel bestaat niet.");
     if (v.status !== "open") throw new UserError("Dit voorstel is al afgehandeld. Ververs de pagina.");
@@ -439,31 +464,31 @@ async function applyChanges(client, prompt, summary, changes) {
       const ent = ENTITIES[c.soort];
       if (c.actie === "toevoegen" && c.soort === "info") {
         const id = "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        const { rows } = await client.query("select coalesce(max(sort),0)+1 as s from info where sectie = $1", [c.velden.sectie]);
+        const { rows } = await client.query("select coalesce(max(sort),0)+1 as s from info where sectie = $1 and reis_id = $2", [c.velden.sectie, R().id]);
         await client.query(
-          "insert into info (id, sectie, sort, label, waarde, tekst) values ($1,$2,$3,$4,$5,$6)",
-          [id, c.velden.sectie, rows[0].s, c.velden.label, c.velden.waarde ?? null, c.velden.tekst ?? null]
+          "insert into info (reis_id, id, sectie, sort, label, waarde, tekst) values ($7,$1,$2,$3,$4,$5,$6)",
+          [id, c.velden.sectie, rows[0].s, c.velden.label, c.velden.waarde ?? null, c.velden.tekst ?? null, R().id]
         );
         log.push({ table: ent.table, key: ent.key, keyValue: id, before: null });
         continue;
       }
       if (c.actie === "toevoegen" && (c.soort === "auto" || c.soort === "budget")) {
         const id = (c.soort === "auto" ? "a" : "b") + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        const { rows } = await client.query(`select coalesce(max(sort),0)+1 as s from ${ent.table}`);
+        const { rows } = await client.query(`select coalesce(max(sort),0)+1 as s from ${ent.table} where reis_id = $1`, [R().id]);
         const cols = Object.keys(c.velden);
         await client.query(
-          `insert into ${ent.table} (id, sort, ${cols.join(", ")}) values ($1, $2, ${cols.map((_, i) => "$" + (i + 3)).join(", ")})`,
-          [id, rows[0].s, ...cols.map((k) => c.velden[k])]
+          `insert into ${ent.table} (reis_id, id, sort, ${cols.join(", ")}) values ($1, $2, $3, ${cols.map((_, i) => "$" + (i + 4)).join(", ")})`,
+          [R().id, id, rows[0].s, ...cols.map((k) => c.velden[k])]
         );
         log.push({ table: ent.table, key: ent.key, keyValue: id, before: null });
         continue;
       }
       if (c.actie === "toevoegen") {
         const id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        const { rows } = await client.query("select coalesce(max(sort),0)+1 as s from checklist");
+        const { rows } = await client.query("select coalesce(max(sort),0)+1 as s from checklist where reis_id = $1", [R().id]);
         await client.query(
-          "insert into checklist (id, sort, title, note, done, groep, deadline, deadline_label) values ($1,$2,$3,$4,coalesce($5,false),$6,$7,$8)",
-          [id, rows[0].s, c.velden.title, c.velden.note ?? null, c.velden.done ?? null, c.velden.groep ?? null, c.velden.deadline ?? null, c.velden.deadline_label ?? null]
+          "insert into checklist (reis_id, id, sort, title, note, done, groep, deadline, deadline_label) values ($9,$1,$2,$3,$4,coalesce($5,false),$6,$7,$8)",
+          [id, rows[0].s, c.velden.title, c.velden.note ?? null, c.velden.done ?? null, c.velden.groep ?? null, c.velden.deadline ?? null, c.velden.deadline_label ?? null, R().id]
         );
         log.push({ table: ent.table, key: ent.key, keyValue: id, before: null });
         continue;
@@ -474,21 +499,21 @@ async function applyChanges(client, prompt, summary, changes) {
         throw new UserError(`"${before.label}" kan niet worden verwijderd, alleen gewijzigd.`);
       }
       if (c.actie === "verwijderen") {
-        await client.query(`delete from ${ent.table} where ${ent.key}::text = $1`, [c.sleutel]);
+        await client.query(`delete from ${ent.table} where ${ent.key}::text = $1 and reis_id = $2`, [c.sleutel, R().id]);
       } else {
         const cols = Object.keys(c.velden);
-        const sets = cols.map((k, i) => `${k} = $${i + 2}${["route", "points"].includes(ent.fields[k]) ? "::jsonb" : ""}`);
+        const sets = cols.map((k, i) => `${k} = $${i + 3}${["route", "points"].includes(ent.fields[k]) ? "::jsonb" : ""}`);
         if (ent.table === "checklist") sets.push("updated_at = now()");
         await client.query(
-          `update ${ent.table} set ${sets.join(", ")} where ${ent.key}::text = $1`,
-          [c.sleutel, ...cols.map((k) => (["route", "points"].includes(ent.fields[k]) ? JSON.stringify(c.velden[k]) : c.velden[k]))]
+          `update ${ent.table} set ${sets.join(", ")} where ${ent.key}::text = $1 and reis_id = $2`,
+          [c.sleutel, R().id, ...cols.map((k) => (["route", "points"].includes(ent.fields[k]) ? JSON.stringify(c.velden[k]) : c.velden[k]))]
         );
       }
       log.push({ table: ent.table, key: ent.key, keyValue: c.sleutel, before });
     }
     const r = await client.query(
-      "insert into change_log (prompt, summary, changes) values ($1,$2,$3) returning id",
-      [String(prompt || "").slice(0, 1000), String(summary || "").slice(0, 600), JSON.stringify({ wijzigingen: clean, log })]
+      "insert into change_log (reis_id, prompt, summary, changes) values ($4,$1,$2,$3) returning id",
+      [String(prompt || "").slice(0, 1000), String(summary || "").slice(0, 600), JSON.stringify({ wijzigingen: clean, log }), R().id]
     );
     return r.rows[0].id;
   }
@@ -521,7 +546,7 @@ async function setPrice(id, waarde) {
   if (why && why.length <= 300) velden.why = why;
   changes.push({ actie: "wijzigen", soort: "overnachting", sleutel: base.id, velden });
   if (oud != null && prijs != null) {
-    const { rows } = await db.query("select id, note from checklist where note like '%€%'");
+    const { rows } = await db.query("select id, note from checklist where note like '%€%' and reis_id = $1", [R().id]);
     for (const r of rows) {
       const note = replacePrice(r.note, oud, prijs);
       if (note && note.length <= 300) changes.push({ actie: "wijzigen", soort: "reservering", sleutel: r.id, velden: { note } });
@@ -556,7 +581,7 @@ async function setAutoPrice(id, veld, waarde) {
   if (notitie && notitie.length <= 1000) velden.notitie = notitie;
   changes.push({ actie: "wijzigen", soort: "auto", sleutel: auto.id, velden });
   if (oud != null && bedrag != null) {
-    const { rows } = await db.query("select id, note from checklist where note like '%€%'");
+    const { rows } = await db.query("select id, note from checklist where note like '%€%' and reis_id = $1", [R().id]);
     for (const r of rows) {
       const note = replacePrice(r.note, oud, bedrag);
       if (note && note.length <= 300) changes.push({ actie: "wijzigen", soort: "reservering", sleutel: r.id, velden: { note } });
@@ -605,13 +630,15 @@ async function undoLast() {
   const client = await db.pool.connect();
   try {
     await client.query("begin");
-    const r = await client.query("select * from change_log where undone_at is null order by id desc limit 1 for update");
+    const r = await client.query("select * from change_log where undone_at is null and reis_id = $1 order by id desc limit 1 for update", [R().id]);
     if (!r.rows[0]) throw new UserError("Er is niets om terug te draaien.");
     const entry = r.rows[0];
     for (const l of [...entry.changes.log].reverse()) {
-      await client.query(`delete from ${l.table} where ${l.key}::text = $1`, [l.keyValue]);
+      await client.query(`delete from ${l.table} where ${l.key}::text = $1 and reis_id = $2`, [l.keyValue, R().id]);
       if (l.before) {
-        await client.query(`insert into ${l.table} select * from json_populate_record(null::${l.table}, $1)`, [JSON.stringify(l.before)]);
+        // Oudere logregels (van vóór meerdere reizen) hebben nog geen reis_id
+        const before = { ...l.before, reis_id: l.before.reis_id || R().id };
+        await client.query(`insert into ${l.table} select * from json_populate_record(null::${l.table}, $1)`, [JSON.stringify(before)]);
       }
     }
     await client.query("update change_log set undone_at = now() where id = $1", [entry.id]);
@@ -633,23 +660,26 @@ async function history() {
              case when v.status = 'toegepast' and cl.undone_at is not null then 'teruggedraaid' else v.status end as status,
              jsonb_array_length(v.wijzigingen) as aantal
         from voorstellen v left join change_log cl on cl.id = v.change_log_id
+       where v.reis_id = $1
       union all
       select -cl.id, cl.prompt, cl.summary, cl.created_at,
              case when cl.undone_at is not null then 'teruggedraaid' else 'toegepast' end,
              jsonb_array_length(cl.changes->'wijzigingen')
         from change_log cl
-       where not exists (select 1 from voorstellen v where v.change_log_id = cl.id)
-    ) h order by created_at desc limit 20`);
+       where cl.reis_id = $1 and not exists (select 1 from voorstellen v where v.change_log_id = cl.id)
+    ) h order by created_at desc limit 20`, [R().id]);
   return r.rows;
 }
 
 // Een korte "versie" van alle gegevens; verandert bij elke wijziging. Gebruikt om andere apparaten te verversen.
 async function dataVersion() {
+  // Per reis, plus de lijst met reizen (zodat een nieuwe of verwijderde reis ook op andere apparaten verschijnt)
   const r = await db.query(`select md5(concat_ws('|',
-      (select max(id) from change_log), (select count(*) from change_log where undone_at is not null),
-      (select max(updated_at) from checklist), (select count(*) from checklist),
-      (select max(id) from voorstellen), (select max(decided_at) from voorstellen))) as v`);
+      (select max(id) from change_log where reis_id = $1), (select count(*) from change_log where undone_at is not null and reis_id = $1),
+      (select max(updated_at) from checklist where reis_id = $1), (select count(*) from checklist where reis_id = $1),
+      (select max(id) from voorstellen where reis_id = $1), (select max(decided_at) from voorstellen where reis_id = $1),
+      (select string_agg(id || ':' || naam, ',' order by id) from reizen))) as v`, [R().id]);
   return r.rows[0].v;
 }
 
-module.exports = { status, propose, openProposal, cancel, applyProposal, undoLast, history, dataVersion, setPrice, setAutoPrice, setBudget, replacePrice, UserError };
+module.exports = { metReis, periode, cleanValue, status, propose, openProposal, cancel, applyProposal, undoLast, history, dataVersion, setPrice, setAutoPrice, setBudget, replacePrice, UserError };

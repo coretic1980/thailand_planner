@@ -112,22 +112,52 @@ app.use((req, res, next) => {
 // Wie ben ik? (de app verbergt de knoppen om aan te passen voor gasten)
 app.get("/api/me", (req, res) => res.json({ rol: roleOf(req) }));
 
-// Alle reisgegevens in één keer
-app.get("/api/trip", async (_req, res, next) => {
+// ---------- Reizen ----------
+const assistant = require("./assistant");
+const reizen = require("./reizen");
+
+// Elke API-aanroep gaat over één reis: ?reis=<id>, anders de eerstvolgende reis.
+// Alles wat daarna gebeurt (lezen, wijzigen, terugdraaien) blijft binnen die reis.
+app.use("/api", async (req, res, next) => {
   try {
-    const [bases, days, legs, check, kaart, info, autos, budget] = await Promise.all([
-      db.query("select * from bases order by nr"),
-      db.query("select to_char(day_date,'YYYY-MM-DD') as iso, * from days order by day_date"),
-      db.query("select * from legs order by sort"),
-      db.query("select *, to_char(deadline,'YYYY-MM-DD') as deadline_iso from checklist order by sort"),
-      db.query("select route, tussenstops, dagtrips from kaart where id = 'kaart'"),
-      db.query("select id, sectie, label, waarde, tekst from info order by sectie, sort, id"),
-      db.query("select * from autohuur order by sort, id"),
-      db.query("select * from budget order by sort, id"),
+    const gevraagd = typeof req.query.reis === "string" ? req.query.reis : "";
+    const reis = (gevraagd && (await reizen.haal(gevraagd))) || (await reizen.standaard());
+    if (!reis) return res.status(404).json({ error: "Er is nog geen reis." });
+    req.reis = reis;
+    assistant.metReis(reis, () => next());
+  } catch (e) {
+    next(e);
+  }
+});
+
+app.get("/api/reizen", async (_req, res, next) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    res.json((await reizen.lijst()).map(({ id, naam, land, start, einde }) => ({ id, naam, land, start, einde })));
+  } catch (e) { next(e); }
+});
+
+// Alle reisgegevens in één keer
+app.get("/api/trip", async (req, res, next) => {
+  try {
+    const id = [req.reis.id];
+    const [bases, days, legs, check, kaart, info, autos, budget, alle] = await Promise.all([
+      db.query("select * from bases where reis_id = $1 order by nr", id),
+      db.query("select to_char(day_date,'YYYY-MM-DD') as iso, * from days where reis_id = $1 order by day_date", id),
+      db.query("select * from legs where reis_id = $1 order by sort", id),
+      db.query("select *, to_char(deadline,'YYYY-MM-DD') as deadline_iso from checklist where reis_id = $1 order by sort", id),
+      db.query("select route, tussenstops, dagtrips from kaart where id = 'kaart' and reis_id = $1", id),
+      db.query("select id, sectie, label, waarde, tekst from info where reis_id = $1 order by sectie, sort, id", id),
+      db.query("select * from autohuur where reis_id = $1 order by sort, id", id),
+      db.query("select * from budget where reis_id = $1 order by sort, id", id),
+      reizen.lijst(),
     ]);
     const k = kaart.rows[0] || { route: [], tussenstops: [], dagtrips: [] };
     res.set("Cache-Control", "no-store");
+    const { notities: _n, ...reis } = req.reis;
     res.json({
+      reis,
+      reizen: alle.map(({ id, naam, land, start, einde }) => ({ id, naam, land, start, einde })),
       bases: bases.rows.map((b) => ({
         id: b.id, n: b.nr, name: b.name, dates: b.dates, nights: b.nights,
         lat: Number(b.lat), lon: Number(b.lon),
@@ -166,8 +196,8 @@ app.patch("/api/checklist/:id", requireAdmin, async (req, res, next) => {
       return res.status(400).json({ error: "Stuur { done: true } of { done: false }." });
     }
     const r = await db.query(
-      "update checklist set done = $1, updated_at = now() where id = $2 returning id, done, updated_at",
-      [req.body.done, req.params.id]
+      "update checklist set done = $1, updated_at = now() where id = $2 and reis_id = $3 returning id, done, updated_at",
+      [req.body.done, req.params.id, req.reis.id]
     );
     if (!r.rowCount) return res.status(404).json({ error: "Onbekend item." });
     res.json({ id: r.rows[0].id, done: r.rows[0].done, updatedAt: r.rows[0].updated_at });
@@ -177,7 +207,6 @@ app.patch("/api/checklist/:id", requireAdmin, async (req, res, next) => {
 });
 
 // ---------- Aanpassen via prompts ----------
-const assistant = require("./assistant");
 
 // Prijs van een overnachting direct aanpassen (veld in de kostenlijst)
 app.patch("/api/budget/:id", requireAdmin, handle((req) => assistant.setBudget(req.params.id, req.body?.bedrag ?? null)));
@@ -221,6 +250,16 @@ app.get("/api/assistant/open", requireAdmin, requireAssistant, handle(() => assi
 app.post("/api/assistant/apply", requireAdmin, requireAssistant, handle((req) => assistant.applyProposal(req.body?.id)));
 app.post("/api/assistant/cancel", requireAdmin, requireAssistant, handle((req) => assistant.cancel(req.body?.id)));
 app.post("/api/assistant/undo", requireAdmin, requireAssistant, handle(() => assistant.undoLast()));
+
+// Nieuwe reis: Claude zet een eerste opzet klaar op basis van een beschrijving (kan een paar minuten duren)
+let nieuweReizen = 0, nieuwVenster = Date.now();
+app.post("/api/reizen", requireAdmin, requireAssistant, (req, res, next) => {
+  if (Date.now() - nieuwVenster > 3600_000) { nieuwVenster = Date.now(); nieuweReizen = 0; }
+  if (++nieuweReizen > 5) return res.status(429).json({ error: "Je kunt maximaal 5 nieuwe reizen per uur laten opzetten." });
+  req.setTimeout(300000);
+  next();
+}, handle((req) => reizen.nieuw(req.body?.beschrijving)));
+app.delete("/api/reizen/:id", requireAdmin, handle((req) => reizen.verwijder(req.params.id)));
 
 // Versie van de app zelf: een vingerafdruk van de bestanden in public/ (behalve foto's).
 // Verandert alleen als een deploy de app echt aanpast, niet als Render de server herstart.

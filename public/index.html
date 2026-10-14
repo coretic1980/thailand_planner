@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e6e6a">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%230e6e6a%22/%3E%3Cpath d=%22M6 20 L13 11 L18 17 L22 13 L27 20 Z%22 fill=%22%23e2603b%22/%3E%3C/svg%3E">
-<title>Thailand Roadtrip 2027</title>
+<title>Reisapp</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
 <style>
 /* Layout: telefoon eerst — vaste navigatie onderin; vanaf 720px tabbladen bovenin; vanaf 1000px brede indeling */
@@ -49,6 +49,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{o
 header.hero{padding-block:14px 8px}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;min-height:32px}
 .topbar .eyebrow{flex:1;min-width:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.reiskeuze{flex:1;min-width:0}
+.reiskeuze select{max-width:100%;font:700 14px var(--body);color:var(--fg);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23888' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center;border:1px solid var(--line);border-radius:999px;padding:8px 34px 8px 14px;min-height:40px;appearance:none;-webkit-appearance:none;text-overflow:ellipsis;cursor:pointer}
+.hero > .eyebrow{margin-top:6px}
+.dlg{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--fg);padding:20px;width:min(560px,calc(100% - 32px));max-height:calc(100vh - 40px)}
+.dlg::backdrop{background:rgba(0,0,0,.45)}
+.dlg h2{margin-top:0}
+.dlg textarea{width:100%;box-sizing:border-box;font:15px var(--body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;margin:6px 0 4px;resize:vertical}
+#reis-beheer{flex-wrap:wrap}
+.dlg .btns,.beheer .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .topbar .acc{display:flex;gap:8px;align-items:center}
 .topbar a.ghost{padding:5px 12px;font-size:13px}
 .hero .sub{font-size:14px}
@@ -291,12 +301,13 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
 
 <div class="wrap">
   <header class="hero">
-    <div class="topbar"><div class="eyebrow" id="hero-label">Gezinsreis</div><div class="acc" id="topbar" hidden><span class="chip" id="rol-chip"></span><a class="ghost" href="logout">Uitloggen</a></div></div>
-    <h1 id="hero-titel">Thailand</h1>
+    <div class="topbar"><div class="reiskeuze" id="reiskeuze" hidden><label for="reis-kies" class="sr">Kies een reis</label><select id="reis-kies"></select></div><div class="acc" id="topbar" hidden><span class="chip" id="rol-chip"></span><a class="ghost" href="logout">Uitloggen</a></div></div>
+    <div class="eyebrow" id="hero-label"></div>
+    <h1 id="hero-titel"></h1>
     <p class="sub" id="hero-tekst"></p>
     <div class="count" id="count"></div>
     <div class="offline" id="offline" hidden>Je bent offline. Je ziet de laatst geladen gegevens; wijzigingen kunnen pas als je weer verbinding hebt.</div>
-    <img class="hero-img zoom" id="hero-img" src="img/13-samet-nangshe.jpg" alt="Phang Nga Bay" data-cap="Phang Nga Bay">
+    <img class="hero-img zoom" id="hero-img" alt="" hidden>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Onderdelen">
@@ -372,12 +383,13 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
       <div>
         <h2>Noodnummers</h2>
         <table class="tbl" id="info-nood"></table>
-        <h2>Handige Thaise woorden</h2>
+        <h2>Handige woorden</h2>
         <table class="tbl" id="info-woorden"></table>
-        <h2>Foto's</h2>
+        <h2 id="fotos-kop">Foto's</h2>
         <p class="note" id="info-fotos"></p>
       </div>
     </div>
+    <div class="beheer" id="reis-beheer" hidden><div><b>Reizen</b><div class="note">Zet een nieuwe reis op, of verwijder deze reis met alles erin.</div></div><div class="btns"><button type="button" class="primary" id="reis-nieuw-knop">Nieuwe reis</button><button type="button" class="ghost" id="reis-weg">Deze reis verwijderen</button></div></div>
     <p class="note" id="rol-info" style="margin-top:24px"></p>
     <p style="margin-top:8px"><a id="logout" class="ghost" href="logout">Uitloggen</a></p>
   </section>
@@ -413,25 +425,81 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
   <button type="button" data-tab="info" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>Info</button>
 </nav>
 
+<dialog class="dlg" id="nieuw-dlg" aria-labelledby="nieuw-kop">
+  <form method="dialog" id="nieuw-form">
+    <h2 id="nieuw-kop">Nieuwe reis</h2>
+    <p class="note">Beschrijf de reis in gewone taal: waarheen, wanneer, met wie en hoe je wilt reizen. Claude zet daarna een eerste opzet klaar met route, dagprogramma, overnachtingen, kaart, reserveringen, praktische info en een budget. Dat duurt meestal 1 tot 3 minuten; daarna pas je alles aan zoals je gewend bent.</p>
+    <label for="nieuw-tekst" class="eyebrow">De reis</label>
+    <textarea id="nieuw-tekst" rows="6" maxlength="3000" placeholder="Bijvoorbeeld: Japan van 1 tot 15 april 2028 met het gezin (kinderen 16 en 19). Landen in Tokyo, terug vanaf Osaka. Met de trein, ook een nacht in een ryokan. Niet te veel gehaast, wel wat natuur."></textarea>
+    <p class="note" id="nieuw-status" aria-live="polite"></p>
+    <div class="btns"><button type="submit" class="primary" id="nieuw-go" value="go">Opzet maken</button><button type="button" class="ghost" id="nieuw-annuleer">Annuleren</button></div>
+  </form>
+</dialog>
 <div class="toast-nieuw" id="nieuwe-versie" role="status" aria-live="polite" hidden><div><b>Nieuwe versie van de app</b><div id="nieuwe-versie-tekst">De app ververst over 5 seconden.</div></div><button type="button" class="primary" id="nieuwe-versie-knop">Nu verversen</button></div>
 <script>
+let REIS=null,REIZEN=[];
 let BASES=[],DAYS=[],LEGS=[],CHECK=[],INFO=[],AUTOS=[],BUDGET=[],KAART={route:[],tussenstops:[],dagtrips:[]};
 let ROLE="admin"; // "gast" kan alleen kijken
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const WD=["zo","ma","di","wo","do","vr","za"];
 const MND=["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
-// Datum in Thailand (UTC+7); met ?vandaag=2027-02-06 te testen
-function todayISO(){const p=new URLSearchParams(location.search).get("vandaag");if(p&&/^\d{4}-\d\d-\d\d$/.test(p))return p;return new Date(Date.now()+7*3600e3).toISOString().slice(0,10)}
+// Datum op de plek van de reis (tijdzone van de reis); met ?vandaag=2027-02-06 te testen
+function todayISO(){const p=new URLSearchParams(location.search).get("vandaag");if(p&&/^\d{4}-\d\d-\d\d$/.test(p))return p;
+  try{return new Intl.DateTimeFormat("en-CA",{timeZone:(REIS&&REIS.tijdzone)||"Asia/Bangkok",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())}
+  catch(e){return new Date().toISOString().slice(0,10)}}
 const dagNaam=iso=>{const d=new Date(iso+"T12:00:00");return `${WD[d.getDay()]} ${d.getDate()} ${MND[d.getMonth()]}`};
 const mapsLink=q=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q);
 const routeLink=q=>"https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(q);
 
 // ---------- Kaart ----------
-const X=lon=>(lon-97.5)*100, Y=lat=>(14.2-lat)*100;
 const LAND=[[98.2,14.2],[101.2,14.2],[101.2,12.7],[100.95,12.65],[100.9,12.95],[100.95,13.35],[100.6,13.5],[100.3,13.48],[100.0,13.35],[99.98,12.8],[99.97,12.55],[100.0,12.2],[99.82,11.8],[99.55,11.2],[99.25,10.5],[99.15,9.95],[99.25,9.4],[99.35,9.15],[99.85,9.25],[100.05,8.4],[100.35,7.75],[100.45,7.5],[99.55,7.5],[99.1,7.8],[98.9,8.05],[98.75,8.0],[98.6,8.3],[98.45,8.25],[98.3,8.2],[98.27,8.65],[98.32,9.2],[98.5,9.7],[98.62,10.0],[98.55,10.8],[98.6,11.5],[98.6,12.4],[98.4,13.2]];
 const PHUKET=[[98.28,8.2],[98.4,8.15],[98.42,7.9],[98.35,7.75],[98.28,7.8],[98.27,8.0]];
+// De kaart van een reis: projectie, kader en land komen uit de reis. Standaard (en in Thailand): Zuid-Thailand met een eigen kustlijn.
+const K_STANDAARD={lonMin:97.5,lonMax:101.2,latMin:7.5,latMax:14.2,schaal:100,cos:1,vb:[-24,0,394,670],land:[LAND,PHUKET],
+  labels:[{naam:"Golf van Thailand",lon:100,lat:8.6},{naam:"Andamanzee",lon:97.64,lat:9.35}]};
+let K=K_STANDAARD;
+const X=lon=>(lon-K.lonMin)*K.schaal*(K.cos||1), Y=lat=>(K.latMax-lat)*K.schaal;
 const poly=p=>p.map(([lo,la])=>X(lo).toFixed(1)+","+Y(la).toFixed(1)).join(" ");
-const VB0={x:-24,y:0,w:394,h:670};let VB={...VB0};
+let VB0={x:-24,y:0,w:394,h:670};let VB={...VB0};
+function zetKaart(k){
+  K=k&&k.schaal?k:K_STANDAARD;const v=K.vb||K_STANDAARD.vb;
+  VB0={x:v[0],y:v[1],w:v[2],h:v[3]};VB={...VB0};
+  if(!(K.land||[]).length)laadWereld();
+}
+// Kustlijnen voor reizen zonder eigen kaart: Natural Earth (1:50m) via world-atlas, bewaard door de service worker
+let WERELD=null,wereldBezig=false;
+function laadWereld(){
+  if(WERELD||wereldBezig)return;wereldBezig=true;
+  fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-50m.json").then(r=>{if(!r.ok)throw new Error(r.status);return r.json()})
+    .then(t=>{WERELD=topoRingen(t,"land");drawMap()}).catch(()=>{wereldBezig=false});
+}
+function topoRingen(t,naam){
+  const [sx,sy]=t.transform.scale,[tx,ty]=t.transform.translate;
+  const arcs=t.arcs.map(a=>{let x=0,y=0;return a.map(([dx,dy])=>{x+=dx;y+=dy;return [x*sx+tx,y*sy+ty]})});
+  const arc=i=>i<0?arcs[~i].slice().reverse():arcs[i];
+  const ring=ix=>{const out=[];ix.forEach((i,k)=>{const a=arc(i);out.push(...(k?a.slice(1):a))});return out};
+  const ringen=[],geo=t.objects[naam];
+  (geo.type==="GeometryCollection"?geo.geometries:[geo]).forEach(g=>{
+    const polys=g.type==="Polygon"?[g.arcs]:g.type==="MultiPolygon"?g.arcs:[];
+    polys.forEach(p=>p.forEach(rg=>ringen.push(ring(rg))));
+  });
+  return ringen.map(rg=>{let a=180,b=-180,c=90,d=-90;rg.forEach(([x,y])=>{if(x<a)a=x;if(x>b)b=x;if(y<c)c=y;if(y>d)d=y});return{rg,box:[a,c,b,d]}});
+}
+// Het land als één SVG-pad (gaten zoals meren via evenodd); null als er (nog) geen kustlijn is
+function landPad(){
+  let ringen=null;
+  if((K.land||[]).length)ringen=K.land;
+  else if(WERELD){
+    const m=2,lo0=(K.lonMin??-180)-m,lo1=(K.lonMax??180)+m,la0=(K.latMin??-90)-m,la1=(K.latMax??90)+m;
+    ringen=WERELD.filter(w=>w.box[0]<=lo1&&w.box[2]>=lo0&&w.box[1]<=la1&&w.box[3]>=la0).map(w=>w.rg);
+  }
+  if(!ringen)return null;
+  let d="";
+  for(const rg of ringen){let px=null,py=null,n=0,stuk="";
+    for(const [lo,la] of rg){const x=X(lo),y=Y(la);if(px!==null&&Math.abs(x-px)<0.6&&Math.abs(y-py)<0.6)continue;stuk+=(n?"L":"M")+x.toFixed(1)+","+y.toFixed(1);px=x;py=y;n++}
+    if(n>2)d+=stuk+"Z"}
+  return d;
+}
 // Label binnen de kaart houden: kies links of rechts afhankelijk van de ruimte
 let meetCtx=null;
 function tekstBreedte(t,grootte){
@@ -462,7 +530,7 @@ function drawTrips(){
   const heeftDag=t.dag&&DAYS.some(d=>d.iso===t.dag);
   box.innerHTML=`<span class="chip">${esc(dagLabel(t.dag)||"Onderweg")}</span>${t.soort==="stop"?'<span class="chip">stop onderweg</span>':""}
    <h3>${t.nr}. ${esc(t.naam)}</h3>${t.foto?`<img class="zoom" src="img/${esc(t.foto)}.jpg" alt="${esc(t.naam)}" data-cap="${esc(t.naam)}" loading="lazy" style="width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:10px;margin:4px 0 8px">`:""}<p>${esc(t.tekst)}</p>
-   <div class="links">${heeftDag?`<a href="#" id="naar-dag">Dagprogramma →</a>`:""}<a href="${mapsLink(t.naam+" Thailand")}" target="_blank" rel="noopener">Google Maps ↗</a><a href="#" id="sluit-info">Sluiten</a></div>`;
+   <div class="links">${heeftDag?`<a href="#" id="naar-dag">Dagprogramma →</a>`:""}<a href="${mapsLink(t.naam+" "+((REIS&&REIS.land)||"Thailand"))}" target="_blank" rel="noopener">Google Maps ↗</a><a href="#" id="sluit-info">Sluiten</a></div>`;
   box.hidden=false;
   const nd=document.getElementById("naar-dag");if(nd)nd.addEventListener("click",e=>{e.preventDefault();openDag(t.dag)});
   document.getElementById("sluit-info").addEventListener("click",e=>{e.preventDefault();SEL=null;drawMap()});
@@ -470,11 +538,10 @@ function drawTrips(){
 function kiesUitstapje(nr){SEL=SEL===nr?null:nr;drawMap()}
 function drawMap(){
   const s=document.getElementById("map");if(!s)return;
-  let h=`<rect x="-400" y="-400" width="1170" height="1470" fill="var(--water)"/>
-  <polygon points="${poly(LAND)}" fill="var(--land)" stroke="var(--line)" stroke-width="1"/>
-  <polygon points="${poly(PHUKET)}" fill="var(--land)" stroke="var(--line)" stroke-width="1"/>
-  <text x="250" y="560" fill="var(--muted)" font-size="12" font-style="italic">Golf van Thailand</text>
-  <text x="14" y="485" fill="var(--muted)" font-size="12" font-style="italic">Andamanzee</text>
+  const pad=landPad();
+  let h=`<rect x="${VB0.x-400}" y="${VB0.y-400}" width="${VB0.w+800}" height="${VB0.h+800}" fill="${pad===null?"var(--land)":"var(--water)"}"/>
+  ${pad?`<path d="${pad}" fill="var(--land)" stroke="var(--line)" stroke-width="1" fill-rule="evenodd"/>`:""}
+  ${(K.labels||[]).filter(l=>l&&l.naam).map(l=>`<text x="${X(l.lon).toFixed(1)}" y="${Y(l.lat).toFixed(1)}" fill="var(--muted)" font-size="12" font-style="italic">${esc(l.naam)}</text>`).join("")}
   <polyline points="${(KAART.route||[]).map(p=>X(p.lon).toFixed(1)+","+Y(p.lat).toFixed(1)).join(" ")}" fill="none" stroke="var(--sun)" stroke-width="3" stroke-linejoin="round"/>`;
   (KAART.tussenstops||[]).filter(p=>!p.tekst).forEach(p=>{const x=X(p.lon),y=Y(p.lat),L=labelSide(x,p.naam,p.links,8,11);h+=`<circle cx="${x}" cy="${y}" r="4.5" fill="var(--surface)" stroke="var(--sun)" stroke-width="2"/>
    <text x="${L.x}" y="${y+4}" text-anchor="${L.anchor}" font-size="11" fill="var(--fg)">${esc(p.naam)}</text>`});
@@ -513,7 +580,7 @@ function drawMap(){
 function zetViewBox(){
   const s=document.getElementById("map"),box=document.getElementById("map-box");if(!s)return;
   VB.w=Math.min(VB0.w,Math.max(VB0.w/5,VB.w));VB.h=VB.w*VB0.h/VB0.w;
-  VB.x=Math.min(VB0.x+VB0.w-VB.w,Math.max(VB0.x,VB.x));VB.y=Math.min(VB0.h-VB.h,Math.max(0,VB.y));
+  VB.x=Math.min(VB0.x+VB0.w-VB.w,Math.max(VB0.x,VB.x));VB.y=Math.min(VB0.y+VB0.h-VB.h,Math.max(VB0.y,VB.y));
   s.setAttribute("viewBox",`${VB.x.toFixed(1)} ${VB.y.toFixed(1)} ${VB.w.toFixed(1)} ${VB.h.toFixed(1)}`);
   const zoom=VB.w<VB0.w-0.5;if(box)box.classList.toggle("zoomed",zoom);
   const r=document.getElementById("zoom-reset");if(r)r.hidden=!zoom;
@@ -777,7 +844,8 @@ function drawInfo(){
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
   set("hero-label",infoVal("hero_label",""));set("hero-titel",infoVal("hero_titel",""));set("hero-tekst",infoVal("hero_tekst",""));
   const hf=infoRow("hero_foto"),img=document.getElementById("hero-img");
-  if(img&&hf.waarde){img.src="img/"+hf.waarde+".jpg";img.alt=hf.tekst||"";img.dataset.cap=hf.tekst||""}
+  if(img){img.hidden=!hf.waarde;if(hf.waarde){img.src=/^https:\/\//.test(hf.waarde)?hf.waarde:"img/"+hf.waarde+".jpg";img.alt=hf.tekst||"";img.dataset.cap=hf.tekst||""}}
+  if(REIS&&REIS.naam)document.title=REIS.naam;
   const of=s=>INFO.filter(r=>r.sectie===s);
   const br=t=>esc(t).replace(/\n/g,"<br>");
   document.getElementById("info-vlucht").innerHTML=of("vlucht").map(r=>`<div class="fl"><div class="lab">${esc(r.label)}</div><div class="big">${esc(r.waarde)}</div>${br(r.tekst)}</div>`).join("");
@@ -786,6 +854,25 @@ function drawInfo(){
   tbl("info-nood",of("nood"),r=>`<b><a href="tel:${esc(r.waarde)}" style="color:inherit">${esc(r.waarde)}</a></b>${r.tekst?` (${esc(r.tekst)})`:""}`);
   tbl("info-woorden",of("woorden"),r=>esc(r.tekst||r.waarde));
   set("info-fotos",infoRow("fotos").tekst||"");
+  const fk=document.getElementById("fotos-kop");if(fk)fk.hidden=!infoRow("fotos").tekst;
+}
+
+// ---------- Reizen ----------
+// Keuzelijst met reizen in de kop; beheerders kunnen er ook een nieuwe reis mee starten
+function drawReizen(){
+  const box=document.getElementById("reiskeuze"),sel=document.getElementById("reis-kies");if(!box||!sel)return;
+  const beheer=ROLE!=="gast";
+  box.hidden=!REIS||!(REIZEN.length>1||beheer);
+  if(box.hidden)return;
+  sel.innerHTML=REIZEN.map(r=>`<option value="${esc(r.id)}" ${REIS&&r.id===REIS.id?"selected":""}>${esc(r.naam)}</option>`).join("")+(beheer?'<option value="__nieuw">+ Nieuwe reis…</option>':"");
+  const rb=document.getElementById("reis-beheer");if(rb)rb.hidden=!beheer;
+  const weg=document.getElementById("reis-weg");if(weg)weg.hidden=REIZEN.length<2;
+  // Voorbeelden bij Aanpassen: de Thaise voorbeelden alleen bij de Thailandreis
+  const ex=document.getElementById("ai-ex");
+  if(ex&&REIS&&REIS.id!=="thailand-2027"&&!ex.dataset.reis){
+    ex.dataset.reis=REIS.id;const b0=BASES[0],b1=BASES[1]||BASES[0],d2=DAYS[2]||DAYS[0];
+    ex.innerHTML=[b0&&`Zet de prijs van het hotel in ${b0.name} op 450 euro`,d2&&`Voeg op ${dagNaam(d2.iso)} een dagtrip toe`,b1&&`Kies in ${b1.name} een ander hotel dicht bij het station`,"Voeg een reservering toe voor de reisverzekering"].filter(Boolean).map(t=>`<button type="button">${esc(t)}</button>`).join("");
+  }
 }
 
 // ---------- Navigatie ----------
@@ -810,8 +897,55 @@ async function loadTrip(){
   const r=await fetch("api/trip",{cache:"no-store"});
   if(!r.ok)throw new Error(r.status);
   const d=await r.json();
+  const vorige=REIS&&REIS.id;
+  REIS=d.reis||null;REIZEN=d.reizen||[];
+  if(REIS){
+    if(REIS.id!==vorige)zetKaart(REIS.kaart);
+    if(REIS_ID!==REIS.id){REIS_ID=REIS.id;const u=new URL(location.href);u.searchParams.set("reis",REIS.id);history.replaceState(null,"",u)}
+    try{localStorage.setItem("reis-id",REIS.id)}catch(e){}
+  }
   BASES=d.bases;DAYS=d.days;LEGS=d.legs;CHECK=d.checklist;KAART=d.kaart||KAART;INFO=d.info||[];AUTOS=d.autos||[];BUDGET=d.budget||[];
 }
+// ---------- Welke reis ----------
+// ?reis=<id> in de adresbalk, anders de laatst gekozen reis; zonder keuze kiest de server de eerstvolgende reis
+let REIS_ID=null;
+try{REIS_ID=new URLSearchParams(location.search).get("reis")||localStorage.getItem("reis-id")}catch(e){}
+// Alle API-aanroepen gaan over de gekozen reis (behalve wie-ben-ik en de lijst met reizen)
+const _fetch=window.fetch.bind(window);
+window.fetch=(u,o)=>_fetch(typeof u==="string"&&/^api\//.test(u)&&!/^api\/(me|reizen)\b/.test(u)&&REIS_ID?u+(u.includes("?")?"&":"?")+"reis="+encodeURIComponent(REIS_ID):u,o);
+function naarReis(id){try{localStorage.setItem("reis-id",id)}catch(e){}location.href="?reis="+encodeURIComponent(id)+"#route"}
+document.getElementById("reis-kies").addEventListener("change",e=>{
+  const v=e.target.value;
+  if(v==="__nieuw"){e.target.value=REIS?REIS.id:"";openNieuw();return}
+  naarReis(v);
+});
+// Nieuwe reis: beschrijving naar de server, Claude zet de opzet klaar
+const dlg=document.getElementById("nieuw-dlg");
+function openNieuw(){
+  const st=document.getElementById("nieuw-status");st.textContent="";st.style.color="var(--muted)";
+  if(typeof dlg.showModal==="function")dlg.showModal();else dlg.setAttribute("open","");
+  setTimeout(()=>document.getElementById("nieuw-tekst").focus(),50);
+}
+let nieuwBezig=false;
+document.getElementById("nieuw-annuleer").addEventListener("click",()=>{if(!nieuwBezig)dlg.close()});
+dlg.addEventListener("cancel",e=>{if(nieuwBezig)e.preventDefault()});
+document.getElementById("reis-nieuw-knop").addEventListener("click",openNieuw);
+document.getElementById("nieuw-form").addEventListener("submit",async e=>{
+  e.preventDefault();if(nieuwBezig)return;
+  const tekst=document.getElementById("nieuw-tekst").value.trim(),st=document.getElementById("nieuw-status"),go=document.getElementById("nieuw-go");
+  const zeg=(t,err)=>{st.textContent=t;st.style.color=err?"var(--sun)":"var(--muted)"};
+  if(tekst.length<10){zeg("Beschrijf de reis in een paar zinnen.",true);return}
+  nieuwBezig=true;go.disabled=true;const t0=Date.now();
+  const tik=setInterval(()=>zeg(`Claude zet de reis op… ${Math.round((Date.now()-t0)/1000)} s. Laat dit venster open.`),1000);zeg("Claude zet de reis op…");
+  try{const r=await api("api/reizen",{beschrijving:tekst});clearInterval(tik);zeg(`Klaar: ${r.naam}. Even laden…`);naarReis(r.id)}
+  catch(err){clearInterval(tik);zeg(err.message||"Er ging iets mis. Probeer het opnieuw.",true);nieuwBezig=false;go.disabled=false}
+});
+document.getElementById("reis-weg").addEventListener("click",async()=>{
+  if(!REIS||!confirm(`Weet je zeker dat je "${REIS.naam}" wilt verwijderen? Alles van deze reis verdwijnt, en dat kan niet ongedaan worden gemaakt.`))return;
+  try{const r=await fetch("api/reizen/"+encodeURIComponent(REIS.id),{method:"DELETE"});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"Verwijderen mislukt.");
+    try{localStorage.removeItem("reis-id")}catch(e){}location.href="./"}
+  catch(err){alert(err.message)}
+});
 // Rol ophalen: gasten kunnen alleen kijken
 const rolKlaar=fetch("api/me",{cache:"no-store"}).then(r=>r.json()).then(d=>{ROLE=d.rol==="gast"?"gast":"admin"}).catch(()=>{}).then(()=>{
   const ri=document.getElementById("rol-info");
@@ -825,7 +959,7 @@ const rolKlaar=fetch("api/me",{cache:"no-store"}).then(r=>r.json()).then(d=>{ROL
     if(document.getElementById("edit")&&!document.getElementById("edit").hidden)show("route");
   }
 });
-function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawAutos();drawCheck();drawKosten();drawInfo();drawCount();drawVandaag()}
+function renderAll(){drawMap();drawLegs();drawDays();drawPlaces();drawAutos();drawCheck();drawKosten();drawInfo();drawCount();drawVandaag();drawReizen()}
 const h=(location.hash||"").slice(1);
 let startTab="route";try{startTab=localStorage.getItem("thai27-tab")||"route"}catch(e){}
 if(["route","dagen","plekken","check","info","edit"].includes(h))startTab=h;

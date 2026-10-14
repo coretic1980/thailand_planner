@@ -1,7 +1,7 @@
 // Service worker: houdt de app bruikbaar zonder internet (onderweg op de boot, in de jungle).
 // - De pagina en de reisgegevens: eerst het netwerk, zonder bereik de laatst bewaarde versie.
 // - Foto's en lettertypes: uit de cache als ze er al zijn.
-const VERSIE = "reisapp-v1";
+const VERSIE = "reisapp-v2";
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSIE).then((c) => c.addAll(["./"]).catch(() => {})).then(() => self.skipWaiting()));
@@ -48,15 +48,17 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(eerstNetwerk(req, "./", (res) => !/no-store/.test(res.headers.get("cache-control") || "")));
     return;
   }
+  // Reisgegevens per reis bewaren (de reis staat in ?reis=)
   if (zelfde && (url.pathname.endsWith("/api/trip") || url.pathname.endsWith("/api/me"))) {
-    e.respondWith(eerstNetwerk(req, url.pathname, () => true));
+    e.respondWith(eerstNetwerk(req, url.pathname + url.search, () => true));
     return;
   }
   if (zelfde && url.pathname.includes("/img/")) {
     e.respondWith(eerstCache(req));
     return;
   }
-  if (url.hostname.endsWith("fonts.googleapis.com") || url.hostname.endsWith("fonts.gstatic.com")) {
+  // Lettertypes en de wereldkaart (kustlijnen) veranderen niet
+  if (url.hostname.endsWith("fonts.googleapis.com") || url.hostname.endsWith("fonts.gstatic.com") || (url.hostname === "cdn.jsdelivr.net" && url.pathname.includes("/world-atlas@"))) {
     e.respondWith(eerstCache(req));
   }
 });

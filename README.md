@@ -1,14 +1,25 @@
-# Thailand Reisapp 2027
+# Reisapp
 
-Reisapp voor de roadtrip Bangkok → Phuket (3–17 februari 2027).
+Reisapp voor meerdere reizen, begonnen met de roadtrip Bangkok → Phuket (3–17 februari 2027).
 Node/Express-app op Render, met de reisgegevens in Neon (Postgres).
+
+## Meerdere reizen
+
+- Bovenaan de app kies je de reis. De keuze staat ook in de link (`?reis=thailand-2027`), zodat je een reis direct kunt delen.
+- **Nieuwe reis** (beheerder): kies "+ Nieuwe reis…" in de keuzelijst of de knop in het tabblad Info, en beschrijf de reis in gewone taal.
+  Claude zet een eerste opzet klaar: overnachtingen (hotels als suggestie), dagprogramma, ritten, kaart met uitstapjes,
+  reserveringen, praktische info, noodnummers, woorden en een budget. Daarna pas je alles aan via "Aanpassen".
+- Elke reis heeft zijn eigen gegevens, geschiedenis en voorstellen; terugdraaien werkt per reis.
+- De kaart van Thailand heeft een eigen kustlijn. Andere reizen gebruiken de kustlijnen van Natural Earth (via `world-atlas` op jsDelivr), die de app daarna offline bewaart.
+- Foto's zijn er (nog) alleen voor Thailand; andere reizen tonen nummers in plaats van foto's.
 
 ## Wat zit erin
 
 | Pad | Inhoud |
 |---|---|
 | `server.js` | Express-server: serveert de app en de API |
-| `assistant.js` | Aanpassen via prompts: Claude-voorstel, controle, toepassen, terugdraaien |
+| `assistant.js` | Aanpassen via prompts: Claude-voorstel, controle, toepassen, terugdraaien (per reis) |
+| `reizen.js` | De lijst met reizen, een nieuwe reis laten opzetten door Claude, een reis verwijderen |
 | `db/schema.sql` | Tabellen: `bases`, `days`, `legs`, `checklist`, `kaart`, `voorstellen`, `change_log` |
 | `db/migraties/` | Latere wijzigingen in de reisgegevens; elk bestand wordt bij het opstarten één keer uitgevoerd |
 | `db/kaart-seed.sql` | Routelijn, tussenstops en dagtrips voor de kaart |
@@ -21,7 +32,10 @@ Node/Express-app op Render, met de reisgegevens in Neon (Postgres).
 
 | Route | Doet |
 |---|---|
-| `GET /api/trip` | Alle reisgegevens in één JSON |
+| `GET /api/reizen` | Alle reizen |
+| `POST /api/reizen` | Nieuwe reis laten opzetten, body `{ "beschrijving": "..." }` (beheerder) |
+| `DELETE /api/reizen/:id` | Reis verwijderen (beheerder; de laatste reis blijft) |
+| `GET /api/trip` | Alle gegevens van de reis in één JSON |
 | `PATCH /api/checklist/:id` | Reservering afvinken, body `{ "done": true }` |
 | `POST /api/assistant/propose` | Voorstel laten maken, body `{ "prompt": "..." }` |
 | `GET /api/assistant/open` | Het open voorstel (na verversen) |
@@ -31,6 +45,8 @@ Node/Express-app op Render, met de reisgegevens in Neon (Postgres).
 | `POST /api/assistant/undo` | Laatste wijziging terugdraaien |
 | `GET /api/assistant/history` | Laatste 15 wijzigingen |
 | `GET /healthz` | Health check voor Render |
+
+Alle `/api`-routes behalve `/api/me` en `/api/reizen` gaan over één reis: `?reis=<id>`. Zonder `reis` kiest de server de eerstvolgende reis.
 
 ## Deployen
 
