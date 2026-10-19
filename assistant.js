@@ -13,6 +13,42 @@ function R() {
   if (!r) throw new Error("Geen reis gekozen.");
   return r;
 }
+// ---------- Rollen en bedragen ----------
+// admin mag alles; medium mag aanpassen maar geen bedragen; gast (easy) ziet geen bedragen.
+const magBedragen = () => { const r = reisOpslag.getStore(); return !r || !r.rol || r.rol === "admin"; };
+const NUM = "\\d(?:[\\d.,]*\\d)?(?:\\s?[–-]\\s?\\d(?:[\\d.,]*\\d)?)?";
+const BEDRAG_RE = new RegExp(`(?:€|EUR|THB)\\s?${NUM}|${NUM}\\s?(?:euro|baht|THB|EUR)\\b`, "gi");
+const bedragenIn = (v) => (JSON.stringify(v ?? "").match(BEDRAG_RE) || []).map((m) => m.replace(/\s/g, "").toLowerCase()).sort().join("|");
+// Gooit een fout als een wijziging van een medium-gebruiker een bedrag zou veranderen
+function controleerBedragen(c, oud) {
+  if (magBedragen()) return;
+  const nee = (wat) => { throw new UserError(`Bedragen aanpassen kan alleen de admin (${wat}). Laat de bedragen staan of vraag het de admin.`); };
+  if (c.soort === "budget") nee("budget");
+  if (c.actie === "verwijderen") { if (oud && bedragenIn(oud)) nee(`verwijderen van ${ENTITIES[c.soort].label.toLowerCase()} met een bedrag`); return; }
+  const ent = ENTITIES[c.soort];
+  for (const [k, v] of Object.entries(c.velden || {})) {
+    if (ent.fields[k] === "prijs") nee(FIELD_LABELS[k] || k);
+    if (bedragenIn(oud ? oud[k] : null) !== bedragenIn(v)) nee(`bedrag in ${FIELD_LABELS[k] || k}`);
+  }
+}
+// Raakt deze wijziging bedragen? (wordt in de geschiedenis bewaard, zodat medium dit niet kan terugdraaien)
+function raaktBedragen(c, oud) {
+  if (c.soort === "budget") return true;
+  if (c.actie === "verwijderen") return !!(oud && bedragenIn(oud));
+  const ent = ENTITIES[c.soort];
+  return Object.entries(c.velden || {}).some(([k, v]) => ent.fields[k] === "prijs" || bedragenIn(oud ? oud[k] : null) !== bedragenIn(v));
+}
+// Voor easy: alle bedragen uit de reisgegevens halen (ook uit teksten)
+function zonderBedragen(d) {
+  const weg = (v) => typeof v === "string" ? v.replace(BEDRAG_RE, (m) => m.replace(new RegExp(NUM), "…"))
+    : Array.isArray(v) ? v.map(weg) : v && typeof v === "object" && !(v instanceof Date) ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, weg(x)])) : v;
+  const out = weg(d);
+  (out.bases || []).forEach((b) => { b.prijs = null; });
+  (out.autos || []).forEach((a) => { a.prijs = null; a.terPlaatse = null; a.terPlaatseTekst = null; a.borg = null; });
+  out.budget = [];
+  return out;
+}
+
 const MND = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
 function periode(r = R()) {
   const a = new Date(r.start + "T12:00:00Z"), b = new Date(r.einde + "T12:00:00Z");
@@ -313,7 +349,7 @@ function systemPrompt(data) {
 De gebruiker vraagt in gewone taal om iets aan te passen. Jij stelt via het hulpmiddel "voorstel" die wijziging voor, plus alles wat nodig is om de rest van de app ermee in overeenstemming te houden.
 
 Regels:
-- Gebruik alleen de sleutels uit de huidige gegevens hieronder.
+${magBedragen() ? "" : "- Deze gebruiker mag GEEN bedragen wijzigen: geen prijs, ter_plaatse of budget, en bedragen in teksten (euro, baht) blijven precies zoals ze zijn. Vraagt de gebruiker toch om een bedrag te wijzigen, geef dan een lege lijst wijzigingen en leg uit dat alleen de admin bedragen kan aanpassen.\n"}- Gebruik alleen de sleutels uit de huidige gegevens hieronder.
 - Je kunt wijzigen: dag (title, drive, items, photo), overnachting (name, dates, nights, hotel, alternative, why, todo, lat, lon, links, hotel_url, hotel_foto, prijs), rit (date_label, route, duration), kaart (route, tussenstops, dagtrips; sleutel "kaart"), reservering (title, note, done, groep, deadline, deadline_label), info (label, waarde, tekst), budget (label, bedrag, toelichting, geboekt), auto (verhuurder, auto, reservering, status, ophalen, ophalen_plek, inleveren, inleveren_plek, prijs, ter_plaatse, ter_plaatse_tekst, borg, details, url, notitie).
 - Toevoegen en verwijderen kan alleen bij reserveringen, info, de huurauto en het budget. Dagen, overnachtingen en ritten kun je niet toevoegen of verwijderen; leg dat dan uit in de samenvatting.
 - Info is de rest van de app: de kop van de pagina en de teller (sectie "algemeen": hero_label, hero_titel, hero_tekst, hero_foto met het onderschrift in tekst, reis_start, reis_einde, reisdagen, afstand, en de fotocredits in "fotos"), de vluchten (sectie "vlucht": label, waarde = tijd, tekst = regels gescheiden door \\n), praktische info (sectie "praktisch": label en tekst), noodnummers (sectie "nood": label, waarde = nummer, tekst = opmerking) en woorden in de taal van het land (sectie "woorden": label = Nederlands, tekst = de vertaling, eventueel met uitspraak). Een nieuwe info-regel geeft je met actie "toevoegen", sleutel null en velden sectie (vlucht, praktisch, nood of woorden), label en tekst of waarde. Regels in de sectie "algemeen" kun je wijzigen, niet toevoegen of verwijderen.
@@ -403,6 +439,7 @@ async function propose(prompt, { claude = callClaude } = {}) {
   const data = await snapshot();
   const raw = await claude(prompt.trim(), data);
   const changes = (Array.isArray(raw.wijzigingen) ? raw.wijzigingen : []).slice(0, MAX_CHANGES).map(cleanChange);
+  for (const c of changes) controleerBedragen(c, c.actie === "toevoegen" ? null : await getRow(db, ENTITIES[c.soort], c.sleutel));
   const beschrijving = [];
   for (const c of changes) beschrijving.push(await describe(c));
   const samenvatting = String(raw.samenvatting || "").slice(0, 600);
@@ -460,8 +497,10 @@ async function applyChanges(client, prompt, summary, changes) {
   const clean = changes.map(cleanChange);
   {
     const log = [];
+    let bedragen = false;
     for (const c of clean) {
       const ent = ENTITIES[c.soort];
+      if (c.actie === "toevoegen") { controleerBedragen(c, null); bedragen = bedragen || raaktBedragen(c, null); }
       if (c.actie === "toevoegen" && c.soort === "info") {
         const id = "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const { rows } = await client.query("select coalesce(max(sort),0)+1 as s from info where sectie = $1 and reis_id = $2", [c.velden.sectie, R().id]);
@@ -495,6 +534,8 @@ async function applyChanges(client, prompt, summary, changes) {
       }
       const before = await getRow(client, ent, c.sleutel);
       if (!before) throw new UserError(`${ent.label} "${c.sleutel}" bestaat niet (meer).`);
+      controleerBedragen(c, before);
+      bedragen = bedragen || raaktBedragen(c, before);
       if (c.soort === "info" && c.actie === "verwijderen" && before.sectie === "algemeen") {
         throw new UserError(`"${before.label}" kan niet worden verwijderd, alleen gewijzigd.`);
       }
@@ -513,7 +554,7 @@ async function applyChanges(client, prompt, summary, changes) {
     }
     const r = await client.query(
       "insert into change_log (reis_id, prompt, summary, changes) values ($4,$1,$2,$3) returning id",
-      [String(prompt || "").slice(0, 1000), String(summary || "").slice(0, 600), JSON.stringify({ wijzigingen: clean, log }), R().id]
+      [String(prompt || "").slice(0, 1000), String(summary || "").slice(0, 600), JSON.stringify({ wijzigingen: clean, log, bedragen }), R().id]
     );
     return r.rows[0].id;
   }
@@ -633,6 +674,11 @@ async function undoLast() {
     const r = await client.query("select * from change_log where undone_at is null and reis_id = $1 order by id desc limit 1 for update", [R().id]);
     if (!r.rows[0]) throw new UserError("Er is niets om terug te draaien.");
     const entry = r.rows[0];
+    if (!magBedragen()) {
+      const w = entry.changes.wijzigingen || [];
+      const oudOverBedragen = w.some((c) => c.soort === "budget" || Object.keys(c.velden || {}).some((k) => ["prijs", "ter_plaatse", "bedrag"].includes(k)));
+      if (entry.changes.bedragen || oudOverBedragen) throw new UserError("De laatste wijziging ging over bedragen; die kan alleen de admin terugdraaien.");
+    }
     for (const l of [...entry.changes.log].reverse()) {
       await client.query(`delete from ${l.table} where ${l.key}::text = $1 and reis_id = $2`, [l.keyValue, R().id]);
       if (l.before) {
@@ -682,4 +728,4 @@ async function dataVersion() {
   return r.rows[0].v;
 }
 
-module.exports = { metReis, periode, cleanValue, status, propose, openProposal, cancel, applyProposal, undoLast, history, dataVersion, setPrice, setAutoPrice, setBudget, replacePrice, UserError };
+module.exports = { zonderBedragen, magBedragen, metReis, periode, cleanValue, status, propose, openProposal, cancel, applyProposal, undoLast, history, dataVersion, setPrice, setAutoPrice, setBudget, replacePrice, UserError };

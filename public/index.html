@@ -234,6 +234,7 @@ details.place[open] summary::after{transform:rotate(-135deg);margin-top:4px}
 
 /* Regelen */
 .totaalregel{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.totaalregel[hidden],.kosten[hidden]{display:none}
 .totaalregel b{font-size:18px}
 .totaalregel a{font-size:13px;font-weight:700;color:var(--sea);text-decoration:none;white-space:nowrap}
 .prog{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:6px 0 4px}
@@ -439,7 +440,7 @@ html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
 <script>
 let REIS=null,REIZEN=[];
 let BASES=[],DAYS=[],LEGS=[],CHECK=[],INFO=[],AUTOS=[],BUDGET=[],KAART={route:[],tussenstops:[],dagtrips:[]};
-let ROLE="admin"; // "gast" kan alleen kijken
+let ROLE="admin"; // "admin": alles; "medium": aanpassen maar geen bedragen; "gast" (easy): alleen kijken, zonder bedragen
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const WD=["zo","ma","di","wo","do","vr","za"];
 const MND=["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
@@ -680,12 +681,15 @@ function kostenSom(){
 }
 // Alle kosten: geboekt (hotels, huurauto) en geschat (budget). Wordt bij elke weergave opnieuw berekend.
 function drawKosten(){
+  // Easy ziet geen bedragen: geen kostenoverzicht
+  {const a=document.getElementById("kosten-plekken"),b=document.getElementById("kosten-sum"),geen=ROLE==="gast";
+   if(a)a.hidden=geen;if(b)b.hidden=geen;if(geen)return}
   const {zonder,tot,autoTot,vast,schat,budTot,geboekt,alles,nachten,nMet}=kostenSom(),pers=parseInt(infoVal("reizigers","4"),10)||4;
   const dagen=Math.max(1,DAYS.length-1);
   const bedrag=n=>n==null||n===""?"":Number(n).toLocaleString("nl-NL",{minimumFractionDigits:2,maximumFractionDigits:2});
   // Eén regel met een bedrag; beheerders kunnen het bedrag hier direct aanpassen
   const rij=(soort,id,veld,label,waarde,uitleg)=>{const iid=`k-${soort}-${id}-${veld}`;
-    return `<tr><td><label for="${esc(iid)}">${label}</label>${uitleg?`<br><small class="note">${esc(uitleg)}</small>`:""}</td><td>${ROLE==="gast"?(waarde!=null&&waarde!==""?eur(waarde):"nog onbekend"):`€ <input class="prijs" id="${esc(iid)}" data-soort="${soort}" data-id="${esc(id)}" data-veld="${veld}" inputmode="decimal" autocomplete="off" placeholder="onbekend" value="${bedrag(waarde)}" aria-label="${label} in euro">`}</td></tr>`};
+    return `<tr><td><label for="${esc(iid)}">${label}</label>${uitleg?`<br><small class="note">${esc(uitleg)}</small>`:""}</td><td>${ROLE!=="admin"?(waarde!=null&&waarde!==""?eur(waarde):"nog onbekend"):`€ <input class="prijs" id="${esc(iid)}" data-soort="${soort}" data-id="${esc(id)}" data-veld="${veld}" inputmode="decimal" autocomplete="off" placeholder="onbekend" value="${bedrag(waarde)}" aria-label="${label} in euro">`}</td></tr>`};
   const kop=t=>`<tr class="kop"><td colspan="2">${t}</td></tr>`;
   const sub=(t,n,uitleg)=>`<tr class="som"><td>${t}${uitleg?`<br><small class="note" style="font-weight:400">${uitleg}</small>`:""}</td><td>${eur(n)}</td></tr>`;
   let rijen=vast.map(b=>rij("budget",b.id,"bedrag",esc(b.label),b.bedrag,b.toelichting)).join("")+kop("Hotels")+BASES.map(b=>rij("hotel",b.id,"prijs",`${esc(b.name)} · ${esc(b.nights)}`,b.prijs)).join("")
@@ -699,10 +703,10 @@ function drawKosten(){
     if(!actief){
       const wasOpen=!!el.querySelector("details[open]");
       el.innerHTML=BASES.length?`<details ${wasOpen?"open":""}><summary><div><div class="note">Reiskosten totaal${zonder.length?" (tot nu toe)":""}</div><div class="tot">${eur(alles)}</div>
-       <div class="note">Geboekt ${eur(geboekt)} (${[...vast.map(b=>b.label.toLowerCase()),"hotels",...(AUTOS.length?["auto"]:[])].join(", ").replace(/, ([^,]*)$/," en $1")})${schat.length?` · geschat ${eur(budTot)} (${schat.map(b=>b.label.split(" ")[0].toLowerCase()).join(", ")})`:""}<br>${eur(alles/pers)} per persoon (${pers} reizigers)</div></div><span class="open-txt">${ROLE==="gast"?"Per onderdeel":"Bedragen"}</span></summary>
+       <div class="note">Geboekt ${eur(geboekt)} (${[...vast.map(b=>b.label.toLowerCase()),"hotels",...(AUTOS.length?["auto"]:[])].join(", ").replace(/, ([^,]*)$/," en $1")})${schat.length?` · geschat ${eur(budTot)} (${schat.map(b=>b.label.split(" ")[0].toLowerCase()).join(", ")})`:""}<br>${eur(alles/pers)} per persoon (${pers} reizigers)</div></div><span class="open-txt">${ROLE!=="admin"?"Per onderdeel":"Bedragen"}</span></summary>
        ${zonder.length?`<p class="note" style="margin:6px 0 0">Nog zonder prijs: ${zonder.map(b=>esc(b.name)).join(", ")}</p>`:""}
        <table class="tbl" style="margin-top:8px">${rijen}<tr class="som totaal"><td>Totaal</td><td>${eur(alles)}</td></tr></table>
-       ${ROLE==="gast"?"":`<p class="note kosten-msg" aria-live="polite" style="margin:6px 0 0">Pas een bedrag aan en druk op Enter; het totaal rekent vanzelf opnieuw.</p>`}</details>`:"";
+       ${ROLE!=="admin"?"":`<p class="note kosten-msg" aria-live="polite" style="margin:6px 0 0">Pas een bedrag aan en druk op Enter; het totaal rekent vanzelf opnieuw.</p>`}</details>`:"";
       el.querySelectorAll("input.prijs").forEach(inp=>{
         inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();inp.blur()}});
         inp.addEventListener("change",()=>bedragWijzigen(inp,el.querySelector(".kosten-msg")));
@@ -861,7 +865,7 @@ function drawInfo(){
 // Keuzelijst met reizen in de kop; beheerders kunnen er ook een nieuwe reis mee starten
 function drawReizen(){
   const box=document.getElementById("reiskeuze"),sel=document.getElementById("reis-kies");if(!box||!sel)return;
-  const beheer=ROLE!=="gast";
+  const beheer=ROLE==="admin";
   box.hidden=!REIS||!(REIZEN.length>1||beheer);
   if(box.hidden)return;
   sel.innerHTML=REIZEN.map(r=>`<option value="${esc(r.id)}" ${REIS&&r.id===REIS.id?"selected":""}>${esc(r.naam)}</option>`).join("")+(beheer?'<option value="__nieuw">+ Nieuwe reis…</option>':"");
@@ -947,15 +951,17 @@ document.getElementById("reis-weg").addEventListener("click",async()=>{
   catch(err){alert(err.message)}
 });
 // Rol ophalen: gasten kunnen alleen kijken
-const rolKlaar=fetch("api/me",{cache:"no-store"}).then(r=>r.json()).then(d=>{ROLE=d.rol==="gast"?"gast":"admin"}).catch(()=>{}).then(()=>{
+const rolKlaar=fetch("api/me",{cache:"no-store"}).then(r=>r.json()).then(d=>{ROLE=["gast","medium","admin"].includes(d.rol)?d.rol:"gast"}).catch(()=>{}).then(()=>{
   const ri=document.getElementById("rol-info");
   const tb=document.getElementById("topbar"),rc=document.getElementById("rol-chip");
-  if(tb&&rc){rc.textContent=ROLE==="gast"?"Gast":"Beheerder";tb.hidden=false}
-  if(ri)ri.textContent=ROLE==="gast"?"Je bent ingelogd als gast: je kunt alles bekijken, maar niets aanpassen. Log uit en log in met het beheerderswachtwoord om iets te wijzigen.":"Je bent ingelogd als beheerder.";
+  if(tb&&rc){rc.textContent={gast:"Easy",medium:"Medium",admin:"Admin"}[ROLE];tb.hidden=false}
+  if(ri)ri.textContent={gast:"Je bent ingelogd als easy: je kunt de reis bekijken, maar niets aanpassen en je ziet geen bedragen.",
+    medium:"Je bent ingelogd als medium: je ziet alles en kunt de reis aanpassen en reserveringen afvinken, maar bedragen aanpassen kan alleen de admin.",
+    admin:"Je bent ingelogd als admin: je ziet en mag alles."}[ROLE];
   const na=document.getElementById("naar-aanpassen");if(na)na.hidden=ROLE==="gast";
   if(ROLE==="gast"){
     const t=document.getElementById("t-edit");if(t)t.hidden=true;
-    const sy=document.getElementById("sync");if(sy)sy.textContent="Je bekijkt de app als gast; afvinken kan alleen de beheerder.";
+    const sy=document.getElementById("sync");if(sy)sy.textContent="Je kunt alleen kijken; afvinken kan alleen met een ander wachtwoord.";
     if(document.getElementById("edit")&&!document.getElementById("edit").hidden)show("route");
   }
 });

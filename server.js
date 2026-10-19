@@ -1,9 +1,11 @@
 // Thailand reisapp: Express-server met Neon (Postgres) als database.
 // Omgevingsvariabelen:
 //   DATABASE_URL  - Neon connection string (verplicht)
-//   APP_PASSWORD  - optioneel; als gezet, toont de app eerst een inlogscherm (gastwachtwoord)
-//   ADMIN_PASSWORD - optioneel; als gezet, kan alleen wie hiermee inlogt iets aanpassen.
-//                   Wie met APP_PASSWORD inlogt, kan dan alleen kijken.
+//   APP_PASSWORD    - optioneel; als gezet, toont de app eerst een inlogscherm.
+//                     Wie hiermee inlogt is "easy": kijken, niets aanpassen en geen bedragen zien.
+//   MEDIUM_PASSWORD - optioneel; "medium": ziet alles en mag aanpassen en afvinken, maar geen bedragen wijzigen.
+//   ADMIN_PASSWORD  - optioneel; "admin": ziet en mag alles.
+//                     Zonder ADMIN_PASSWORD is iedereen die inlogt admin (zoals vroeger).
 //   PORT          - wordt door Render gezet
 
 const express = require("express");
@@ -31,6 +33,7 @@ app.get("/healthz", async (_req, res) => {
 app.set("trust proxy", 1); // Render zet een proxy voor de app
 const PASSWORD = process.env.APP_PASSWORD || "";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+const MEDIUM_PASSWORD = process.env.MEDIUM_PASSWORD || "";
 const COOKIE = "reis_sessie";
 const MAX_AGE = 30 * 24 * 3600; // seconden
 function safeEqual(a, b) {
@@ -38,9 +41,10 @@ function safeEqual(a, b) {
   const hb = crypto.createHash("sha256").update(String(b)).digest();
   return crypto.timingSafeEqual(ha, hb);
 }
-// Eén sessietoken per rol. Zonder ADMIN_PASSWORD is iedereen die inlogt beheerder (zoals vroeger).
-const sessionToken = (rol) => crypto.createHmac("sha256", PASSWORD + "|" + ADMIN_PASSWORD)
-  .update(rol === "admin" && ADMIN_PASSWORD ? "thailand-reisapp-sessie-v2-admin" : "thailand-reisapp-sessie-v2-gast").digest("hex");
+// Rollen: "admin" (alles), "medium" (alles zien en aanpassen, behalve bedragen) en "gast" (= easy: kijken, zonder bedragen).
+// Eén sessietoken per rol. Zonder ADMIN_PASSWORD is iedereen die inlogt admin (zoals vroeger).
+const sessionToken = (rol) => crypto.createHmac("sha256", PASSWORD + "|" + ADMIN_PASSWORD + "|" + MEDIUM_PASSWORD)
+  .update(`thailand-reisapp-sessie-v3-${rol}`).digest("hex");
 function readCookie(req, name) {
   for (const part of (req.headers.cookie || "").split(";")) {
     const i = part.indexOf("=");
@@ -54,6 +58,7 @@ function roleOf(req) {
   const c = readCookie(req, COOKIE);
   if (!c) return null;
   if (ADMIN_PASSWORD && safeEqual(c, sessionToken("admin"))) return "admin";
+  if (MEDIUM_PASSWORD && safeEqual(c, sessionToken("medium"))) return ADMIN_PASSWORD ? "medium" : "admin";
   if (safeEqual(c, sessionToken("gast"))) return ADMIN_PASSWORD ? "gast" : "admin";
   return null;
 }
@@ -61,7 +66,15 @@ const loggedIn = (req) => roleOf(req) !== null;
 const isAdmin = (req) => roleOf(req) === "admin";
 function requireAdmin(req, res, next) {
   if (isAdmin(req)) return next();
-  res.status(403).json({ error: "Je bent ingelogd als gast en kunt alleen kijken. Log in met het beheerderswachtwoord om iets aan te passen." });
+  res.status(403).json({ error: roleOf(req) === "medium"
+    ? "Bedragen aanpassen en reizen beheren kan alleen de admin."
+    : "Je kunt alleen kijken. Log in met een ander wachtwoord om iets aan te passen." });
+}
+// Aanpassen en afvinken: admin en medium
+function requireEditor(req, res, next) {
+  const rol = roleOf(req);
+  if (rol === "admin" || rol === "medium") return next();
+  res.status(403).json({ error: "Je kunt alleen kijken. Log in met een ander wachtwoord om iets aan te passen." });
 }
 function setCookie(req, res, value, maxAge) {
   const secure = req.secure ? "; Secure" : "";
@@ -88,6 +101,7 @@ app.post("/login", (req, res) => {
   const pw = typeof req.body?.password === "string" ? req.body.password : "";
   let rol = null;
   if (pw && ADMIN_PASSWORD && safeEqual(pw, ADMIN_PASSWORD)) rol = "admin";
+  else if (pw && MEDIUM_PASSWORD && safeEqual(pw, MEDIUM_PASSWORD)) rol = ADMIN_PASSWORD ? "medium" : "admin";
   else if (pw && safeEqual(pw, PASSWORD)) rol = ADMIN_PASSWORD ? "gast" : "admin";
   if (!rol) return res.status(401).json({ error: "Dat wachtwoord klopt niet." });
   attempts.delete(req.ip);
@@ -124,7 +138,8 @@ app.use("/api", async (req, res, next) => {
     const reis = (gevraagd && (await reizen.haal(gevraagd))) || (await reizen.standaard());
     if (!reis) return res.status(404).json({ error: "Er is nog geen reis." });
     req.reis = reis;
-    assistant.metReis(reis, () => next());
+    // De rol gaat mee, zodat de assistent weet of bedragen mogen veranderen
+    assistant.metReis({ ...reis, rol: roleOf(req) || "gast" }, () => next());
   } catch (e) {
     next(e);
   }
@@ -154,8 +169,9 @@ app.get("/api/trip", async (req, res, next) => {
     ]);
     const k = kaart.rows[0] || { route: [], tussenstops: [], dagtrips: [] };
     res.set("Cache-Control", "no-store");
-    const { notities: _n, ...reis } = req.reis;
-    res.json({
+    const { notities: _n, rol: _r, ...reis } = req.reis;
+    const zonderBedragen = roleOf(req) === "gast";
+    res.json((zonderBedragen ? assistant.zonderBedragen : (x) => x)({
       reis,
       reizen: alle.map(({ id, naam, land, start, einde }) => ({ id, naam, land, start, einde })),
       bases: bases.rows.map((b) => ({
@@ -183,14 +199,14 @@ app.get("/api/trip", async (req, res, next) => {
         terPlaatseTekst: a.ter_plaatse_tekst, borg: a.borg, details: a.details || [], url: a.url, notitie: a.notitie,
       })),
       budget: budget.rows.map((b) => ({ id: b.id, label: b.label, bedrag: b.bedrag == null ? null : Number(b.bedrag), toelichting: b.toelichting, geboekt: !!b.geboekt })),
-    });
+    }));
   } catch (e) {
     next(e);
   }
 });
 
 // Een reservering afvinken of terugzetten
-app.patch("/api/checklist/:id", requireAdmin, async (req, res, next) => {
+app.patch("/api/checklist/:id", requireEditor, async (req, res, next) => {
   try {
     if (typeof req.body?.done !== "boolean") {
       return res.status(400).json({ error: "Stuur { done: true } of { done: false }." });
@@ -238,18 +254,18 @@ function handle(fn) {
 
 app.get("/api/assistant/status", (req, res) => {
   const s = assistant.status();
-  if (s.enabled && !isAdmin(req)) return res.json({ enabled: false, gast: true, reason: "je bent ingelogd als gast. Log in met het beheerderswachtwoord om iets aan te passen." });
+  if (s.enabled && roleOf(req) === "gast") return res.json({ enabled: false, gast: true, reason: "je kunt alleen kijken. Log in met een ander wachtwoord om iets aan te passen." });
   res.json(s);
 });
-app.get("/api/assistant/history", requireAdmin, requireAssistant, handle(() => assistant.history()));
-app.post("/api/assistant/propose", requireAdmin, requireAssistant, (req, res, next) => {
+app.get("/api/assistant/history", requireEditor, requireAssistant, handle(() => assistant.history()));
+app.post("/api/assistant/propose", requireEditor, requireAssistant, (req, res, next) => {
   if (!underLimit()) return res.status(429).json({ error: "Je hebt het maximum van 30 voorstellen per uur bereikt." });
   next();
 }, handle((req) => assistant.propose(req.body?.prompt)));
-app.get("/api/assistant/open", requireAdmin, requireAssistant, handle(() => assistant.openProposal()));
-app.post("/api/assistant/apply", requireAdmin, requireAssistant, handle((req) => assistant.applyProposal(req.body?.id)));
-app.post("/api/assistant/cancel", requireAdmin, requireAssistant, handle((req) => assistant.cancel(req.body?.id)));
-app.post("/api/assistant/undo", requireAdmin, requireAssistant, handle(() => assistant.undoLast()));
+app.get("/api/assistant/open", requireEditor, requireAssistant, handle(() => assistant.openProposal()));
+app.post("/api/assistant/apply", requireEditor, requireAssistant, handle((req) => assistant.applyProposal(req.body?.id)));
+app.post("/api/assistant/cancel", requireEditor, requireAssistant, handle((req) => assistant.cancel(req.body?.id)));
+app.post("/api/assistant/undo", requireEditor, requireAssistant, handle(() => assistant.undoLast()));
 
 // Nieuwe reis: Claude zet een eerste opzet klaar op basis van een beschrijving (kan een paar minuten duren)
 let nieuweReizen = 0, nieuwVenster = Date.now();
